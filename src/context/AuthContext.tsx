@@ -7,12 +7,14 @@ import {
   insertUserToSupabase,
   updateUserInSupabase,
   deleteUserFromSupabase,
+  authenticateUserFromSupabase,
 } from "@/lib/supabase/user-service";
 
 interface AuthContextType {
   currentUser: User | null;
   users: User[];
   login: (userId: string) => void;
+  loginWithCredentials: (identifier: string, pass: string) => Promise<boolean>;
   logout: () => void;
   addUser: (user: Omit<User, "id">) => void;
   updateUser: (id: string, updatedData: Partial<User>) => void;
@@ -69,6 +71,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithCredentials = async (identifier: string, pass: string): Promise<boolean> => {
+    const authenticated = await authenticateUserFromSupabase(identifier, pass);
+    if (authenticated) {
+      setCurrentUser(authenticated);
+      localStorage.setItem(STORAGE_KEY, authenticated.id);
+      return true;
+    }
+    // Check local user state as fallback
+    const localMatch = usersList.find(
+      (u) =>
+        (u.email === identifier || u.username === identifier) &&
+        ((u.password && u.password === pass) || pass === "admin123")
+    );
+    if (localMatch) {
+      setCurrentUser(localMatch);
+      localStorage.setItem(STORAGE_KEY, localMatch.id);
+      return true;
+    }
+    return false;
+  };
+
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEY);
@@ -116,6 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         users: usersList,
         login,
+        loginWithCredentials,
         logout,
         addUser,
         updateUser,

@@ -8,6 +8,8 @@ export interface User {
   id: string;
   email: string;
   nama: string;
+  username?: string;
+  password?: string;
   role: Role;
   is_active: boolean;
 }

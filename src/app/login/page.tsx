@@ -3,119 +3,107 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import Image from "next/image";
 
 export default function LoginPage() {
-  const { users, currentUser, login } = useAuth();
-  const [selectedUserId, setSelectedUserId] = useState<string>(
-    currentUser?.id || users[0]?.id || ""
-  );
+  const { loginWithCredentials } = useAuth();
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedUserId) {
-      login(selectedUserId);
-      router.push("/");
-    }
-  };
+    setErrorMsg("");
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case "administrator":
-        return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300";
-      case "admin_humas":
-        return "bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300";
-      case "pegawai":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
-      case "eksternal":
-        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
-      default:
-        return "bg-gray-100 text-gray-700";
+    if (!identifier.trim() || !password.trim()) {
+      setErrorMsg("Harap isi username/email dan password Anda.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const success = await loginWithCredentials(identifier.trim(), password.trim());
+    setIsSubmitting(false);
+
+    if (success) {
+      router.push("/");
+    } else {
+      setErrorMsg("Username/Email atau Password tidak cocok / belum terdaftar!");
     }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12">
-      <div className="w-full max-w-md space-y-8 rounded-2xl bg-white dark:bg-gray-800 p-8 shadow-xl border border-gray-100 dark:border-gray-700">
+      <div className="w-full max-w-md space-y-6 rounded-2xl bg-white dark:bg-gray-800 p-8 shadow-xl border border-gray-100 dark:border-gray-700">
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="h-16 w-16 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-500 font-bold text-2xl">
+            <div className="h-16 w-16 rounded-2xl bg-brand-500 flex items-center justify-center text-white font-bold text-2xl shadow-md">
               BPS
             </div>
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
             Sistem Humas Internal
           </h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            BPS Kabupaten Lebak
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            BPS Kabupaten Lebak &bull; Portal Kehumasan & Dokumen
           </p>
-          <div className="mt-3 inline-block rounded-full bg-orange-100 dark:bg-orange-950/40 px-3 py-1 text-xs font-semibold text-brand-600 dark:text-brand-400">
-            Simulasi Role-Based Login
-          </div>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+        {errorMsg && (
+          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 dark:bg-rose-950/40 dark:border-rose-800 text-rose-600 dark:text-rose-300 text-xs font-semibold flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        <form className="space-y-4" onSubmit={handleLogin}>
           <div>
             <label
-              htmlFor="user-select"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              htmlFor="identifier"
+              className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5"
             >
-              Pilih Pengguna untuk Login
+              Username / Email BPS
             </label>
-            <select
-              id="user-select"
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              className="block w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-3.5 text-gray-900 dark:text-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 text-sm font-medium transition"
-            >
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.nama} ({user.role.toUpperCase()}) - {user.email}
-                </option>
-              ))}
-            </select>
+            <input
+              id="identifier"
+              type="text"
+              required
+              placeholder="Masukkan username atau email..."
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              className="block w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-3 text-gray-900 dark:text-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 text-xs font-medium transition"
+            />
           </div>
 
-          {/* Selected user detail card */}
-          {selectedUserId && (
-            <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 p-4 space-y-2">
-              {(() => {
-                const u = users.find((item) => item.id === selectedUserId);
-                if (!u) return null;
-                return (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-gray-900 dark:text-white text-sm">
-                        {u.nama}
-                      </span>
-                      <span
-                        className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${getRoleBadge(
-                          u.role
-                        )}`}
-                      >
-                        {u.role}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {u.email}
-                    </p>
-                  </>
-                );
-              })()}
-            </div>
-          )}
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5"
+            >
+              Kata Sandi / Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              placeholder="Masukkan kata sandi..."
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="block w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-3 text-gray-900 dark:text-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 text-xs font-medium transition"
+            />
+          </div>
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-brand-500 hover:bg-brand-600 p-3.5 text-white font-semibold shadow-md hover:shadow-lg transition duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer"
+            disabled={isSubmitting}
+            className="w-full rounded-xl bg-brand-500 hover:bg-brand-600 p-3.5 text-white font-bold text-xs shadow-md hover:shadow-lg transition duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50 cursor-pointer disabled:opacity-50"
           >
-            Masuk ke Sistem
+            {isSubmitting ? "Memverifikasi..." : "Masuk ke Sistem"}
           </button>
         </form>
 
-        <div className="text-center text-xs text-gray-400 dark:text-gray-500">
-          Mode Simulasi Development &bull; BPS Kabupaten Lebak
+        <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-700 pt-4">
+          BPS Kabupaten Lebak &bull; Integrated Public Relations Application
         </div>
       </div>
     </div>

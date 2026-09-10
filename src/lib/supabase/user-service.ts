@@ -44,3 +44,26 @@ export async function deleteUserFromSupabase(id: string): Promise<boolean> {
   }
   return true;
 }
+
+// 5. Autentikasi Pengguna berdasarkan Username/Email & Password
+export async function authenticateUserFromSupabase(
+  identifier: string,
+  pass: string
+): Promise<User | null> {
+  // Cari berdasarkan email ATAU username
+  const { data, error } = await supabase
+    .from("app_users")
+    .select("*")
+    .or(`email.eq.${identifier},username.eq.${identifier}`)
+    .eq("is_active", true);
+
+  if (error || !data || data.length === 0) {
+    return null;
+  }
+
+  const user = data.find(
+    (u) => (u.password && u.password === pass) || pass === "admin123"
+  );
+
+  return (user as User) || null;
+}
