@@ -427,6 +427,34 @@ export default function Dokse2026Page() {
     return filteredData.slice(start, start + itemsPerPage);
   }, [filteredData, currentPage, itemsPerPage]);
 
+  // Helper Halaman Pagination Ringkas dengan Elipsis (...)
+  const paginationPages = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const pages: (number | string)[] = [];
+    pages.push(1);
+
+    if (currentPage > 3) {
+      pages.push("...");
+    }
+
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    if (currentPage < totalPages - 2) {
+      pages.push("...");
+    }
+
+    pages.push(totalPages);
+    return pages;
+  }, [totalPages, currentPage]);
+
   // Handler Update Kolom Pengecekan
   // CATATAN KHUSUS: Jika Peta Desa diubah, maka seluruh SLS dalam desa yang sama otomatis ikut berubah!
   const handleUpdateItem = async (idsubsls: string, field: keyof DokseItem, value: string) => {
@@ -1155,51 +1183,87 @@ export default function Dokse2026Page() {
                   setItemsPerPage(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="py-1 px-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-semibold text-gray-900 dark:text-white focus:outline-none"
+                className="py-1 px-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-semibold text-gray-900 dark:text-white focus:outline-none cursor-pointer"
               >
-                <option value={5}>5</option>
                 <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
               </select>
               <span>baris per halaman</span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap justify-center sm:justify-end">
               <span className="text-gray-500 dark:text-gray-400 mr-2">
-                Halaman <strong className="text-gray-900 dark:text-white">{currentPage}</strong> dari <strong className="text-gray-900 dark:text-white">{totalPages}</strong>
+                Halaman <strong className="text-gray-900 dark:text-white">{currentPage}</strong> dari{" "}
+                <strong className="text-gray-900 dark:text-white">{totalPages}</strong>
               </span>
 
+              {/* Tombol Pertama (<<) */}
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                title="Halaman Pertama"
+                className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold text-xs flex items-center justify-center cursor-pointer"
+              >
+                «
+              </button>
+
+              {/* Tombol Sebelumnya (<) */}
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium cursor-pointer"
+                title="Halaman Sebelumnya"
+                className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold text-xs flex items-center justify-center cursor-pointer"
               >
-                ← Prev
+                ‹
               </button>
 
+              {/* Angka Halaman Ringkas dengan Elipsis (...) */}
               <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                      currentPage === pageNum
-                        ? "bg-brand-500 text-white shadow-sm"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
+                {paginationPages.map((page, idx) =>
+                  page === "..." ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="w-6 text-center text-xs font-bold text-gray-400 select-none"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(Number(page))}
+                      className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                        currentPage === page
+                          ? "bg-brand-500 text-white shadow-sm font-bold"
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
               </div>
 
+              {/* Tombol Berikutnya (>) */}
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium cursor-pointer"
+                title="Halaman Berikutnya"
+                className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold text-xs flex items-center justify-center cursor-pointer"
               >
-                Next →
+                ›
+              </button>
+
+              {/* Tombol Terakhir (>>) */}
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                title="Halaman Terakhir"
+                className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold text-xs flex items-center justify-center cursor-pointer"
+              >
+                »
               </button>
             </div>
           </div>
