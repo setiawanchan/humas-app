@@ -71,9 +71,10 @@ async function handleReminder(request: Request) {
     if (targetItems.length === 0) {
       return NextResponse.json({
         success: true,
-        message: `Tidak ada konten yang perlu diingatkan untuk tanggal ${targetDate}.`,
+        message: `Tidak ada konten aktif (draft/siap/terjadwal) yang jatuh tempo hari ini (${targetDate}).`,
         targetDate,
-        totalItems: 0,
+        totalContentsFound: 0,
+        totalPicsInvolved: 0,
         emailsSent: 0,
       });
     }

@@ -697,7 +697,7 @@ export default function KalenderKontenPage() {
       {reminderResult && (
         <div
           className={`rounded-xl p-4 border text-xs transition relative flex items-start justify-between gap-3 ${
-            reminderResult.totalContentsFound === 0
+            (reminderResult.totalContentsFound === 0 || reminderResult.totalItems === 0)
               ? "bg-sky-50 border-sky-200 text-sky-900 dark:bg-sky-950/40 dark:border-sky-900 dark:text-sky-200"
               : reminderResult.success
               ? "bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-200"
@@ -707,14 +707,14 @@ export default function KalenderKontenPage() {
           <div className="space-y-1">
             <div className="font-bold flex items-center gap-1.5">
               <span>
-                {reminderResult.totalContentsFound === 0
+                {(reminderResult.totalContentsFound === 0 || reminderResult.totalItems === 0)
                   ? "ℹ️"
                   : reminderResult.success
                   ? "✅"
                   : "⚠️"}
               </span>
               <span>
-                {reminderResult.totalContentsFound === 0
+                {(reminderResult.totalContentsFound === 0 || reminderResult.totalItems === 0)
                   ? "Informasi Jadwal Konten"
                   : reminderResult.success
                   ? "Pengiriman Pengingat Selesai"
@@ -722,8 +722,8 @@ export default function KalenderKontenPage() {
               </span>
             </div>
             <p className="opacity-90">
-              {reminderResult.totalContentsFound === 0
-                ? `Tidak ada jadwal konten aktif (draft/siap/terjadwal) yang jatuh tempo hari ini (${reminderResult.targetDate}). Tidak ada email yang perlu dikirim.`
+              {(reminderResult.totalContentsFound === 0 || reminderResult.totalItems === 0)
+                ? (reminderResult.message || `Tidak ada jadwal konten aktif (draft/siap/terjadwal) yang jatuh tempo hari ini (${reminderResult.targetDate || "hari ini"}). Tidak ada email yang perlu dikirim.`)
                 : reminderResult.message ||
                   `Berhasil mengirim ${reminderResult.emailsSent || 0} email dari ${
                     reminderResult.totalPicsInvolved || 0
