@@ -127,6 +127,11 @@ const getStatusLabel = (status: ContentCalendarItem["status"]) => {
 };
 
 // Helper Label Platform
+import {
+  getKalenderKontenFromSupabase,
+  insertKalenderKontenToSupabase,
+} from "@/lib/supabase/kalender-service";
+
 const getPlatformLabel = (platform: ContentCalendarItem["platform"]) => {
   const item = PLATFORM_OPTIONS.find((p) => p.id === platform);
   return item ? `${item.icon} ${item.label}` : `📱 ${platform || "Media Sosial"}`;
@@ -140,7 +145,22 @@ export default function KalenderKontenPage() {
     currentUser?.role === "administrator" || currentUser?.role === "admin_humas";
 
   // State Utama Data Items
-  const [items, setItems] = useState<ContentCalendarItem[]>(mockContentCalendar);
+  const [items, setItems] = useState<ContentCalendarItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchKalender() {
+      setIsLoading(true);
+      const remote = await getKalenderKontenFromSupabase();
+      if (remote && remote.length > 0) {
+        setItems(remote as any);
+      } else {
+        setItems(mockContentCalendar);
+      }
+      setIsLoading(false);
+    }
+    fetchKalender();
+  }, []);
 
   // State Tampilan Mode: "calendar" | "list"
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
