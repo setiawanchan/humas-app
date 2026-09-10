@@ -51,6 +51,8 @@ export default function AdminUsersPage() {
   const [formData, setFormData] = useState({
     nama: "",
     email: "",
+    username: "",
+    password: "",
     role: "pegawai" as Role,
     is_active: true,
   });
@@ -66,12 +68,13 @@ export default function AdminUsersPage() {
   // Logika Filter
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      // 1. Text Search Filter (Nama & Email)
+      // 1. Text Search Filter (Nama & Email & Username)
       if (searchQuery.trim() !== "") {
         const q = searchQuery.toLowerCase();
         const matchesName = u.nama.toLowerCase().includes(q);
         const matchesEmail = u.email.toLowerCase().includes(q);
-        if (!matchesName && !matchesEmail) return false;
+        const matchesUsername = u.username?.toLowerCase().includes(q);
+        if (!matchesName && !matchesEmail && !matchesUsername) return false;
       }
 
       // 2. Filter Role
@@ -111,6 +114,8 @@ export default function AdminUsersPage() {
     setFormData({
       nama: "",
       email: "",
+      username: "",
+      password: "",
       role: "pegawai",
       is_active: true,
     });
@@ -123,6 +128,8 @@ export default function AdminUsersPage() {
     setFormData({
       nama: u.nama,
       email: u.email,
+      username: u.username || "",
+      password: "", // Kosongkan password saat edit kecuali ingin diganti
       role: u.role,
       is_active: u.is_active,
     });
@@ -133,20 +140,22 @@ export default function AdminUsersPage() {
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const payload: Partial<User> & { nama: string; email: string; role: Role; is_active: boolean } = {
+      nama: formData.nama,
+      email: formData.email,
+      username: formData.username.trim() || undefined,
+      role: formData.role,
+      is_active: formData.is_active,
+    };
+
+    if (formData.password.trim()) {
+      payload.password = formData.password.trim();
+    }
+
     if (editingUser) {
-      updateUser(editingUser.id, {
-        nama: formData.nama,
-        email: formData.email,
-        role: formData.role,
-        is_active: formData.is_active,
-      });
+      updateUser(editingUser.id, payload);
     } else {
-      addUser({
-        nama: formData.nama,
-        email: formData.email,
-        role: formData.role,
-        is_active: formData.is_active,
-      });
+      addUser(payload as Omit<User, "id">);
     }
 
     setIsFormOpen(false);
@@ -480,17 +489,46 @@ export default function AdminUsersPage() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Alamat Email *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="Contoh: ahmad@bps.go.id"
+                    className="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-medium text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Username BPS
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    placeholder="Contoh: ahmadfauzi"
+                    className="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-medium text-xs"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Alamat Email *
+                  Kata Sandi / Password {editingUser ? "(Biarkan kosong jika tidak diubah)" : "*"}
                 </label>
                 <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Contoh: ahmad@bps.go.id"
-                  className="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-medium"
+                  type="password"
+                  required={!editingUser}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder={editingUser ? "Masukkan password baru jika ingin mengubah..." : "Masukkan kata sandi..."}
+                  className="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 font-medium text-xs"
                 />
               </div>
 

@@ -79,11 +79,6 @@ export default function DashboardPage() {
             <h1 className="text-2xl md:text-3xl font-bold">
               Selamat datang, {currentUser?.nama || "Pengguna"}!
             </h1>
-            <span
-              className={`text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wide bg-white/20 text-white backdrop-blur-sm border border-white/30`}
-            >
-              Role: {currentUser?.role}
-            </span>
           </div>
           <p className="text-orange-100 text-sm max-w-2xl">
             Sistem Humas Internal BPS Kabupaten Lebak — Mengelola dokumentasi kegiatan, kalender konten media sosial, dan arsip dokumen kantor.
