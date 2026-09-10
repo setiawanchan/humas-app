@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
 import { mockDokseData, DokseItem } from "@/lib/dokse-data";
 import { Modal } from "@/components/ui/modal";
+import { useAuth } from "@/context/AuthContext";
 import {
   getDokseDataFromSupabase,
   updateDokseItemInSupabase,
@@ -33,11 +34,7 @@ export default function Dokse2026Page() {
     loadData();
   }, []);
 
-  // State Admin / Login Mode (Default: View Only)
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
-  const [loginError, setLoginError] = useState("");
+
 
   // State Modal Dashboard Stats
   const [isDashboardModalOpen, setIsDashboardModalOpen] = useState(false);
@@ -445,16 +442,36 @@ export default function Dokse2026Page() {
     }
   };
 
-  // Handler Login Admin
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  // State Admin / Login Mode (Default: View Only)
+  const { currentUser, loginWithCredentials } = useAuth();
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
+  const [loginError, setLoginError] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Otomatis Aktifkan Mode Edit jika user yang login di sistem utama ber-role Administrator/Admin Humas
+  useEffect(() => {
+    if (currentUser && (currentUser.role === "administrator" || currentUser.role === "admin_humas")) {
+      setIsAdminLoggedIn(true);
+    }
+  }, [currentUser]);
+
+  // Handler Login Admin (Terhubung ke Supabase User Service)
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginForm.username === "admin" && loginForm.password === "admin123") {
+    setLoginError("");
+    setIsLoggingIn(true);
+
+    const success = await loginWithCredentials(loginForm.username.trim(), loginForm.password.trim());
+    setIsLoggingIn(false);
+
+    if (success) {
       setIsAdminLoggedIn(true);
       setIsLoginModalOpen(false);
       setLoginForm({ username: "", password: "" });
-      setLoginError("");
     } else {
-      setLoginError("Username atau password salah! (Gunakan demo: admin / admin123)");
+      setLoginError("Username/Email atau Password tidak cocok dengan akun Supabase!");
     }
   };
 
@@ -1062,28 +1079,28 @@ export default function Dokse2026Page() {
             <form onSubmit={handleLoginSubmit} className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Username Admin
+                  Username / Email BPS
                 </label>
                 <input
                   type="text"
                   required
                   value={loginForm.username}
                   onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                  placeholder="admin"
+                  placeholder="Masukkan username/email..."
                   className="w-full p-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
 
               <div>
                 <label className="block font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Password Admin
+                  Kata Sandi / Password
                 </label>
                 <input
                   type="password"
                   required
                   value={loginForm.password}
                   onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                  placeholder="admin123"
+                  placeholder="Masukkan password..."
                   className="w-full p-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
@@ -1098,9 +1115,10 @@ export default function Dokse2026Page() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow"
+                  disabled={isLoggingIn}
+                  className="px-5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow disabled:opacity-50"
                 >
-                  Masuk Admin
+                  {isLoggingIn ? "Memverifikasi..." : "Masuk Admin"}
                 </button>
               </div>
             </form>
