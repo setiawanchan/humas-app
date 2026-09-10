@@ -158,6 +158,9 @@ export function formatActivityFolderName(dateStr: string, title: string): string
   return `${yyyymmdd}_${cleanTitle}`;
 }
 
+// ID Folder Induk Utama Google Drive Kantor BPS Lebak
+export const DEFAULT_GOOGLE_DRIVE_PARENT_FOLDER_ID = "13TsWALJI38xE55YxY1QOT9RsTpowq5y-";
+
 // 3. Buat Hirarki Folder Simetris:
 // [Parent Folder: 13TsWALJI38xE55YxY1QOT9RsTpowq5y-]
 //   ├── 📁 Dokumentasi
@@ -169,7 +172,10 @@ export async function createActivityFolderHierarchy(
   title: string,
   moduleType: "dokumentasi" | "arsip" = "dokumentasi"
 ): Promise<{ folderId: string; webViewLink: string }> {
-  const rootParentFolderId = process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID || undefined;
+  // Gunakan variabel environment jika ada, jika belum disetel di Vercel gunakan ID induk pasti
+  const rootParentFolderId =
+    process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID ||
+    DEFAULT_GOOGLE_DRIVE_PARENT_FOLDER_ID;
 
   // Tentukan nama folder modul utama: "Dokumentasi" atau "Arsip"
   const moduleFolderName = moduleType === "arsip" ? "Arsip" : "Dokumentasi";

@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
-import { getGoogleAccessToken } from "@/lib/google/drive";
+import {
+  getGoogleAccessToken,
+  DEFAULT_GOOGLE_DRIVE_PARENT_FOLDER_ID,
+} from "@/lib/google/drive";
 
 export async function GET() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-  const parentFolderId = process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID;
+  const parentFolderId =
+    process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID ||
+    DEFAULT_GOOGLE_DRIVE_PARENT_FOLDER_ID;
 
   const envStatus = {
     hasClientId: !!clientId,
