@@ -92,6 +92,9 @@ export async function authenticateUserFromSupabase(
   }
 
   const hashedInputPass = await hashPassword(cleanPass);
+  console.log("Debug Auth -> Input Pass:", cleanPass);
+  console.log("Debug Auth -> Input Hash:", hashedInputPass);
+  console.log("Debug Auth -> DB Pass:", data[0]?.password);
 
   const user = data.find((u) => {
     if (!u.password) return false;
