@@ -6,9 +6,17 @@ import "flatpickr/dist/flatpickr.css";
 import { useAuth } from "@/context/AuthContext";
 import { mockDocumentation, Documentation } from "@/lib/mock-data";
 import { Modal } from "@/components/ui/modal";
+import {
+  getDokumentasiFromSupabase,
+  insertDokumentasiToSupabase,
+  updateDokumentasiInSupabase,
+  deleteDokumentasiFromSupabase,
+  DokumentasiItem,
+} from "@/lib/supabase/kalender-service";
 
 type SortColumn = "judul" | "tanggal";
 type SortDirection = "asc" | "desc";
+
 
 // Helper Formatting Tanggal Indonesia Lengkap (contoh: 14 Agustus 2026)
 const formatIndonesianDate = (dateStr: string) => {
@@ -85,13 +93,36 @@ export default function DokumentasiPage() {
   const canManage =
     currentUser?.role === "administrator" || currentUser?.role === "admin_humas";
 
-  // State data dokumentasi (lokal React state)
+  // State data dokumentasi
   const [items, setItems] = useState<Documentation[]>(mockDocumentation);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load data dari Supabase
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const remote = await getDokumentasiFromSupabase();
+        if (remote && remote.length > 0) {
+          setItems(remote as unknown as Documentation[]);
+        } else {
+          setItems(mockDocumentation);
+        }
+      } catch (err) {
+        console.error("Error fetching dokumentasi from Supabase:", err);
+        setItems(mockDocumentation);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   // State Search & Filter (Default ke Bulan & Tahun Saat Ini)
   const currentDate = new Date();
   const currentYearStr = currentDate.getFullYear().toString();
   const currentMonthStr = (currentDate.getMonth() + 1).toString();
+
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedYear, setSelectedYear] = useState<string>(currentYearStr);
@@ -287,49 +318,70 @@ export default function DokumentasiPage() {
   };
 
   // Submit Form (Tambah / Edit)
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (editingItem) {
-      // Edit mode
-      // TODO: Replace with Supabase update query (supabase.from('documentation').update(...).eq('id', editingItem.id))
+      // Edit mode: update Supabase
+      const payload: Partial<DokumentasiItem> = {
+        judul: formData.judul,
+        deskripsi: formData.deskripsi,
+        tanggal_kegiatan: formData.tanggal_kegiatan,
+      };
+
+      // Optimistic update
       setItems((prev) =>
         prev.map((item) =>
           item.id === editingItem.id
             ? {
                 ...item,
-                judul: formData.judul,
-                deskripsi: formData.deskripsi,
-                tanggal_kegiatan: formData.tanggal_kegiatan,
+                ...payload,
               }
             : item
         )
       );
+
+      setIsFormOpen(false);
+      await updateDokumentasiInSupabase(editingItem.id, payload);
     } else {
       // Create mode
-      // Generate URL simulasi Google Drive berbasis Judul Kegiatan
-      // TODO: Replace with Google Drive API call (googleDrive.createFolder(formData.judul))
       const slug = formData.judul
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "");
       const generatedDriveUrl = `https://drive.google.com/drive/u/0/folders/bps-lebak-${slug || Date.now()}`;
 
-      // TODO: Replace with Supabase insert query (supabase.from('documentation').insert(...))
-      const newItem: Documentation = {
-        id: `d_${Date.now()}`,
+      const payload: Omit<DokumentasiItem, "id"> = {
         judul: formData.judul,
         deskripsi: formData.deskripsi,
-        kategori: "foto",
         tanggal_kegiatan: formData.tanggal_kegiatan,
+        drive_url: generatedDriveUrl,
+        uploaded_by: currentUser?.nama || currentUser?.id || "Admin",
+      };
+
+      const tempItem: Documentation = {
+        id: `temp_${Date.now()}`,
+        judul: payload.judul,
+        deskripsi: payload.deskripsi,
+        kategori: "foto",
+        tanggal_kegiatan: payload.tanggal_kegiatan,
         tags: [],
         drive_url: generatedDriveUrl,
-        uploaded_by: currentUser?.id || "u3",
+        uploaded_by: payload.uploaded_by || "",
       };
-      setItems((prev) => [newItem, ...prev]);
-    }
 
-    setIsFormOpen(false);
+      setItems((prev) => [tempItem, ...prev]);
+      setIsFormOpen(false);
+
+      const inserted = await insertDokumentasiToSupabase(payload);
+      if (inserted && inserted.id) {
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === tempItem.id ? (inserted as unknown as Documentation) : item
+          )
+        );
+      }
+    }
   };
 
   // Trigger Hapus
@@ -339,12 +391,15 @@ export default function DokumentasiPage() {
   };
 
   // Confirm Hapus
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingItem) return;
-    // TODO: Replace with Supabase delete query (supabase.from('documentation').delete().eq('id', deletingItem.id))
-    setItems((prev) => prev.filter((i) => i.id !== deletingItem.id));
+    const targetId = deletingItem.id;
+    setItems((prev) => prev.filter((i) => i.id !== targetId));
     setDeletingItem(null);
+
+    await deleteDokumentasiFromSupabase(targetId);
   };
+
 
   const monthsList = [
     { value: "1", label: "Januari" },

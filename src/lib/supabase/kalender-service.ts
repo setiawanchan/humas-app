@@ -37,18 +37,17 @@ export async function insertKalenderKontenToSupabase(item: Partial<KalenderKonte
 export interface DokumentasiItem {
   id?: string;
   judul: string;
-  deskripsi: string;
-  kategori?: string;
   tanggal_kegiatan: string;
-  tags?: string[];
+  deskripsi: string;
   drive_url?: string;
   uploaded_by?: string;
+  created_at?: string;
 }
 
 export async function getDokumentasiFromSupabase(): Promise<DokumentasiItem[]> {
   try {
     const { data, error } = await supabase
-      .from("documentation")
+      .from("dokumentasi")
       .select("*")
       .order("tanggal_kegiatan", { ascending: false });
 
@@ -56,12 +55,13 @@ export async function getDokumentasiFromSupabase(): Promise<DokumentasiItem[]> {
       return data as DokumentasiItem[];
     }
   } catch (err) {
-    console.warn("Supabase documentation fetch error:", err);
+    console.warn("Supabase dokumentasi fetch error:", err);
   }
 
+  // Fallback cek nama tabel documentation jika ada
   try {
     const { data: dataAlt, error: errorAlt } = await supabase
-      .from("dokumentasi")
+      .from("documentation")
       .select("*")
       .order("tanggal_kegiatan", { ascending: false });
 
@@ -69,9 +69,49 @@ export async function getDokumentasiFromSupabase(): Promise<DokumentasiItem[]> {
       return dataAlt as DokumentasiItem[];
     }
   } catch (err) {
-    console.warn("Supabase dokumentasi fetch error:", err);
+    console.warn("Supabase documentation fallback error:", err);
   }
 
   return [];
 }
+
+export async function insertDokumentasiToSupabase(item: Omit<DokumentasiItem, "id">): Promise<DokumentasiItem | null> {
+  const { data, error } = await supabase
+    .from("dokumentasi")
+    .insert(item)
+    .select();
+
+  if (error) {
+    console.error("Error inserting dokumentasi:", error);
+    return null;
+  }
+  return data?.[0] as DokumentasiItem;
+}
+
+export async function updateDokumentasiInSupabase(id: string, updatedData: Partial<DokumentasiItem>): Promise<boolean> {
+  const { error } = await supabase
+    .from("dokumentasi")
+    .update(updatedData)
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error updating dokumentasi:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteDokumentasiFromSupabase(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("dokumentasi")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting dokumentasi:", error);
+    return false;
+  }
+  return true;
+}
+
 
