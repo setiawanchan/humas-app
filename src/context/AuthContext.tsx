@@ -78,17 +78,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(STORAGE_KEY, authenticated.id);
       return true;
     }
-    // Check local user state as fallback
-    const localMatch = usersList.find(
-      (u) =>
-        (u.email === identifier || u.username === identifier) &&
-        ((u.password && u.password === pass) || pass === "admin123")
-    );
-    if (localMatch) {
-      setCurrentUser(localMatch);
-      localStorage.setItem(STORAGE_KEY, localMatch.id);
-      return true;
-    }
     return false;
   };
 
