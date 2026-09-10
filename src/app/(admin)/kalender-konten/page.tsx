@@ -472,15 +472,26 @@ export default function KalenderKontenPage() {
     setIsSendingReminder(true);
     setReminderResult(null);
     try {
-      const res = await fetch("/api/cron/reminder-konten", {
+      const todayDate = getTodayWIB();
+      const res = await fetch(`/api/cron/reminder-konten?date=${todayDate}`, {
         method: "POST",
       });
       const data = await res.json();
-      setReminderResult(data);
+      if (!res.ok) {
+        setReminderResult({
+          success: false,
+          error: data?.error || `HTTP ${res.status}: Gagal memproses pengingat`,
+          message: data?.message || data?.error || "Gagal memproses permintaan ke server.",
+          targetDate: todayDate,
+        });
+      } else {
+        setReminderResult(data);
+      }
     } catch (err: any) {
       setReminderResult({
         success: false,
         error: err?.message || "Gagal menghubungi server pengingat.",
+        message: err?.message || "Koneksi ke server gagal.",
       });
     } finally {
       setIsSendingReminder(false);
@@ -722,7 +733,9 @@ export default function KalenderKontenPage() {
               </span>
             </div>
             <p className="opacity-90">
-              {(reminderResult.totalContentsFound === 0 || reminderResult.totalItems === 0)
+              {reminderResult.success === false
+                ? (reminderResult.message || reminderResult.error || "Terjadi kendala saat mengirim email pengingat.")
+                : (reminderResult.totalContentsFound === 0 || reminderResult.totalItems === 0)
                 ? (reminderResult.message || `Tidak ada jadwal konten aktif (draft/siap/terjadwal) yang jatuh tempo hari ini (${reminderResult.targetDate || "hari ini"}). Tidak ada email yang perlu dikirim.`)
                 : reminderResult.message ||
                   `Berhasil mengirim ${reminderResult.emailsSent || 0} email dari ${

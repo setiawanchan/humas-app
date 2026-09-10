@@ -28,17 +28,27 @@ async function handleReminder(request: Request) {
     const secret = searchParams.get("secret");
     const testDate = searchParams.get("date"); // Opsional: untuk testing manual tanggal tertentu
 
-    // Proteksi CRON_SECRET jika disetel di environment variables
-    // Mendukung header Authorization dari Vercel Cron (`Bearer <CRON_SECRET>`) dan query parameter `?secret=...`
+    // Proteksi CRON_SECRET:
+    // Jika request berasal dari origin internal aplikasi yang sama (klik tombol web admin),
+    // atau jika header Authorization / query secret sesuai dengan CRON_SECRET, maka izinkan.
     const expectedSecret = process.env.CRON_SECRET;
-    if (expectedSecret) {
+    const origin = request.headers.get("origin") || "";
+    const referer = request.headers.get("referer") || "";
+    const host = request.headers.get("host") || "";
+    const isInternalRequest = (origin && host && origin.includes(host)) || (referer && host && referer.includes(host));
+
+    if (expectedSecret && !isInternalRequest) {
       const authHeader = request.headers.get("authorization");
       const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null;
       const isAuthorized = secret === expectedSecret || bearerToken === expectedSecret;
 
       if (!isAuthorized) {
         return NextResponse.json(
-          { error: "Unauthorized: Invalid or missing secret key" },
+          { 
+            success: false, 
+            error: "Unauthorized: Invalid or missing CRON_SECRET",
+            message: "Akses ditolak: CRON_SECRET tidak valid atau tidak disertakan." 
+          },
           { status: 401 }
         );
       }
