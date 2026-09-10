@@ -337,11 +337,42 @@ export default function DokumentasiPage() {
 
     try {
       if (editingItem) {
-        // Edit mode: update Supabase
+        // Edit mode: Jika ada file baru yang dipilih, unggah & tambahkan (append) ke folder Drive kegiatan yang sudah ada
+        let updatedDriveUrl = editingItem.drive_url;
+
+        if (formData.selectedFiles && formData.selectedFiles.length > 0) {
+          setUploadStatusText(`Mengunggah ${formData.selectedFiles.length} berkas tambahan ke Google Drive...`);
+          try {
+            const driveBody = new FormData();
+            driveBody.append("judul", formData.judul);
+            driveBody.append("tanggal_kegiatan", formData.tanggal_kegiatan);
+            driveBody.append("module", "dokumentasi");
+            if (editingItem.drive_url) {
+              driveBody.append("drive_url", editingItem.drive_url);
+            }
+            formData.selectedFiles.forEach((file) => {
+              driveBody.append("files", file);
+            });
+
+            const uploadRes = await fetch("/api/upload-drive", {
+              method: "POST",
+              body: driveBody,
+            });
+
+            const uploadData = await uploadRes.json();
+            if (uploadData && uploadData.drive_url) {
+              updatedDriveUrl = uploadData.drive_url;
+            }
+          } catch (uploadErr) {
+            console.warn("Gagal mengunggah file tambahan ke Drive:", uploadErr);
+          }
+        }
+
         const payload: Partial<DokumentasiItem> = {
           judul: formData.judul,
           deskripsi: formData.deskripsi,
           tanggal_kegiatan: formData.tanggal_kegiatan,
+          drive_url: updatedDriveUrl,
         };
 
         // Optimistic update

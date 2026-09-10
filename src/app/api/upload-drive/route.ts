@@ -40,14 +40,33 @@ export async function POST(request: Request) {
       });
     }
 
-    // 1. Buat struktur folder hirarkis di Google Drive:
-    // Dokumentasi: [Parent] -> [Tahun] -> [Bulan] -> [Kegiatan]
-    // Arsip:       [Parent] -> [Arsip] -> [Tahun] -> [Bulan] -> [Kegiatan]
-    const { folderId, webViewLink } = await createActivityFolderHierarchy(
-      tanggal,
-      judul,
-      moduleType
-    );
+    const existingFolderId = (formData.get("folder_id") as string) || "";
+    const existingDriveUrl = (formData.get("drive_url") as string) || "";
+
+    // 1. Dapatkan folder Google Drive tujuan:
+    // Jika sudah ada folderId atau driveUrl, gunakan folder tersebut agar file baru ter-append ke folder lama
+    let folderId = existingFolderId;
+    let webViewLink = existingDriveUrl;
+
+    if (!folderId && existingDriveUrl) {
+      const match = existingDriveUrl.match(/folders\/([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        folderId = match[1];
+      }
+    }
+
+    if (!folderId) {
+      // Buat struktur folder hirarkis di Google Drive jika belum ada:
+      // Dokumentasi: [Parent] -> Dokumentasi -> [Tahun] -> [Bulan] -> [Kegiatan]
+      // Arsip:       [Parent] -> Arsip -> [Tahun] -> [Bulan] -> [Kegiatan]
+      const hierarchy = await createActivityFolderHierarchy(
+        tanggal,
+        judul,
+        moduleType
+      );
+      folderId = hierarchy.folderId;
+      webViewLink = hierarchy.webViewLink;
+    }
 
     // 2. Upload setiap file ke dalam folder kegiatan
     const uploadResults = [];
