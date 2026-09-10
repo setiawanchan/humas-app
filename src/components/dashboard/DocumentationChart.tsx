@@ -1,17 +1,44 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { ApexOptions } from "apexcharts";
 import dynamic from "next/dynamic";
-import { mockDocumentation } from "@/lib/mock-data";
+import { mockDocumentation, Documentation } from "@/lib/mock-data";
+import { getDokumentasiFromSupabase } from "@/lib/supabase/kalender-service";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
 });
 
 export default function DocumentationChart() {
-  const [selectedYear, setSelectedYear] = useState<string>("2026");
+  const currentRealDate = new Date();
+  const currentRealYear = currentRealDate.getFullYear().toString();
+  const currentRealMonthIdx = currentRealDate.getMonth();
+
+  const [selectedYear, setSelectedYear] = useState<string>(currentRealYear);
   const [selectedRange, setSelectedRange] = useState<string>("current");
+  const [items, setItems] = useState<Documentation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const remote = await getDokumentasiFromSupabase();
+        if (remote && remote.length > 0) {
+          setItems(remote as Documentation[]);
+        } else {
+          setItems(mockDocumentation);
+        }
+      } catch (err) {
+        console.error("Error fetching documentation for chart:", err);
+        setItems(mockDocumentation);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   const allMonths = [
     "Jan",
@@ -28,35 +55,118 @@ export default function DocumentationChart() {
     "Des",
   ];
 
+  const fullMonthNames = [
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+
+  // Distribution calculation berbasis data riil
   const chartData = useMemo(() => {
-    const fullYearDoc = [12, 18, 15, 22, 28, 24, 30, 25, mockDocumentation.length + 15, 14, 16, 20];
+    const targetYearNum = parseInt(selectedYear, 10);
 
     if (selectedRange === "current") {
+      // 4 Minggu dalam Bulan Berjalan
+      const targetMonthIdx =
+        selectedYear === currentRealYear ? currentRealMonthIdx : 8; // fallback ke September jika beda tahun
+      const monthName = fullMonthNames[targetMonthIdx];
+
+      const weeklyData = [0, 0, 0, 0];
+
+      items.forEach((item) => {
+        if (!item.tanggal_kegiatan) return;
+        const d = new Date(item.tanggal_kegiatan);
+        if (isNaN(d.getTime())) return;
+        if (d.getFullYear() === targetYearNum && d.getMonth() === targetMonthIdx) {
+          const dateNum = d.getDate();
+          const weekIdx = Math.min(Math.floor((dateNum - 1) / 7), 3);
+          weeklyData[weekIdx]++;
+        }
+      });
+
       return {
         categories: ["Minggu 1", "Minggu 2", "Minggu 3", "Minggu 4"],
-        data: [5, 8, 4, mockDocumentation.length],
-        subtitle: `September ${selectedYear} (Bulan Berjalan)`,
+        data: weeklyData,
+        subtitle: `${monthName} ${selectedYear} (Per Minggu)`,
       };
     } else if (selectedRange === "ytd") {
+      // Jan s.d. Bulan Berjalan
+      const endMonthIdx =
+        selectedYear === currentRealYear ? currentRealMonthIdx : 8;
+      const categories = allMonths.slice(0, endMonthIdx + 1);
+      const monthlyData = new Array(categories.length).fill(0);
+
+      items.forEach((item) => {
+        if (!item.tanggal_kegiatan) return;
+        const d = new Date(item.tanggal_kegiatan);
+        if (isNaN(d.getTime())) return;
+        if (d.getFullYear() === targetYearNum && d.getMonth() <= endMonthIdx) {
+          monthlyData[d.getMonth()]++;
+        }
+      });
+
       return {
-        categories: allMonths.slice(0, 9),
-        data: fullYearDoc.slice(0, 9),
-        subtitle: `Jan s.d. Sep ${selectedYear}`,
+        categories,
+        data: monthlyData,
+        subtitle: `Jan s.d. ${allMonths[endMonthIdx]} ${selectedYear}`,
       };
     } else if (selectedRange === "yearly") {
+      // 4 Tahun Terakhir
+      const currentY = parseInt(currentRealYear, 10);
+      const categories = [
+        (currentY - 3).toString(),
+        (currentY - 2).toString(),
+        (currentY - 1).toString(),
+        currentY.toString(),
+      ];
+      const yearlyData = [0, 0, 0, 0];
+
+      items.forEach((item) => {
+        if (!item.tanggal_kegiatan) return;
+        const d = new Date(item.tanggal_kegiatan);
+        if (isNaN(d.getTime())) return;
+        const yStr = d.getFullYear().toString();
+        const yIdx = categories.indexOf(yStr);
+        if (yIdx !== -1) {
+          yearlyData[yIdx]++;
+        }
+      });
+
       return {
-        categories: ["2023", "2024", "2025", "2026"],
-        data: [142, 198, 245, mockDocumentation.length + 250],
-        subtitle: "Tren 4 Tahun Terakhir (2023 - 2026)",
+        categories,
+        data: yearlyData,
+        subtitle: `Tren 4 Tahun Terakhir (${categories[0]} - ${categories[3]})`,
       };
     } else {
+      // Setahun Penuh (12 Bulan)
+      const fullYearData = new Array(12).fill(0);
+
+      items.forEach((item) => {
+        if (!item.tanggal_kegiatan) return;
+        const d = new Date(item.tanggal_kegiatan);
+        if (isNaN(d.getTime())) return;
+        if (d.getFullYear() === targetYearNum) {
+          fullYearData[d.getMonth()]++;
+        }
+      });
+
       return {
         categories: allMonths,
-        data: fullYearDoc,
+        data: fullYearData,
         subtitle: `Setahun Penuh (${selectedYear})`,
       };
     }
-  }, [selectedYear, selectedRange]);
+  }, [items, selectedYear, selectedRange, currentRealYear, currentRealMonthIdx]);
+
 
   const totalItem = chartData.data.reduce((a, b) => a + b, 0);
 
@@ -181,8 +291,8 @@ export default function DocumentationChart() {
             onChange={(e) => setSelectedRange(e.target.value)}
             className="py-1 px-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-[11px] font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           >
-            <option value="current">📍 Bulan Ini (Sep)</option>
-            <option value="ytd">📆 Jan - Sep</option>
+            <option value="current">📍 Bulan Ini ({allMonths[currentRealMonthIdx]})</option>
+            <option value="ytd">📆 Jan - {allMonths[currentRealMonthIdx]}</option>
             <option value="full">🗓️ Setahun Penuh</option>
             <option value="yearly">📈 Tren Tahunan</option>
           </select>
