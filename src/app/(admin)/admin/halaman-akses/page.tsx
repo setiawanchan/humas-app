@@ -382,7 +382,7 @@ export default function AdminHalamanAksesPage() {
                             ⚙️
                           </button>
                           <Link
-                            href={`/dashboard-kegiatan/${page.slug}`}
+                            href={page.slug.startsWith("/") ? page.slug : page.slug === "dok-se2026" ? "/dok-se2026" : `/dashboard-kegiatan/${page.slug}`}
                             title="Pratinjau Halaman"
                             className="p-1.5 rounded-lg text-sky-600 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-950/30 transition cursor-pointer"
                           >

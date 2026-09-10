@@ -82,7 +82,16 @@ export interface DashboardPage {
   is_active: boolean;
 }
 
-export const mockDashboardPages: DashboardPage[] = [];
+export const mockDashboardPages: DashboardPage[] = [
+  {
+    id: "page_dok_se2026",
+    nama_page: "Pengecekan Dokumen Sensus Ekonomi 2026",
+    slug: "dok-se2026",
+    deskripsi: "Sistem Validasi & Pengawasan Kelengkapan Peta dan Dokumen PSLS BPS Kabupaten Lebak",
+    requires_login: false,
+    is_active: true,
+  },
+];
 
 export interface DashboardPageAccess {
   id: string;
@@ -92,7 +101,11 @@ export interface DashboardPageAccess {
   user_id?: string;
 }
 
-export const mockDashboardPageAccess: DashboardPageAccess[] = [];
+export const mockDashboardPageAccess: DashboardPageAccess[] = [
+  { id: "acc_1", dashboard_page_id: "page_dok_se2026", access_type: "role", role: "administrator" },
+  { id: "acc_2", dashboard_page_id: "page_dok_se2026", access_type: "role", role: "admin_humas" },
+  { id: "acc_3", dashboard_page_id: "page_dok_se2026", access_type: "role", role: "pegawai" },
+];
 
 export interface Arsip {
   id: string;
