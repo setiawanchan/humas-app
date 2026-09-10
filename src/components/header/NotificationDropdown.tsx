@@ -4,7 +4,7 @@ import Link from "next/link";
 import React, { useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
-import { mockContentCalendar, mockUsers, ContentCalendarItem } from "@/lib/mock-data";
+import { mockContentCalendar, mockUsers, ContentCalendarItem, parsePicIds } from "@/lib/mock-data";
 
 export default function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -30,8 +30,8 @@ export default function NotificationDropdown() {
     .slice(0, 5);
 
   const getPicName = (pic: string | string[] | undefined) => {
-    if (!pic) return "-";
-    const ids = Array.isArray(pic) ? pic : [pic];
+    const ids = parsePicIds(pic);
+    if (ids.length === 0) return "-";
     const names = ids.map((id) => {
       const user = mockUsers.find((u) => u.id === id);
       return user ? user.nama : id;

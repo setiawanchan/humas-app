@@ -10,6 +10,7 @@ import {
   mockUsers,
   ContentCalendarItem,
   Documentation,
+  parsePicIds,
 } from "@/lib/mock-data";
 import {
   getKalenderKontenFromSupabase,
@@ -45,8 +46,8 @@ const formatIndonesianDate = (dateStr: string) => {
 };
 
 const getPicName = (pic: string | string[] | undefined) => {
-  if (!pic) return "-";
-  const ids = Array.isArray(pic) ? pic : [pic];
+  const ids = parsePicIds(pic);
+  if (ids.length === 0) return "-";
   const names = ids.map((id) => {
     const user = mockUsers.find((u) => u.id === id);
     return user ? user.nama : id;

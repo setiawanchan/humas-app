@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getKalenderKontenFromSupabase } from "@/lib/supabase/kalender-service";
 import { getUsersFromSupabase } from "@/lib/supabase/user-service";
-import { mockContentCalendar, mockUsers, ContentCalendarItem, User } from "@/lib/mock-data";
+import { mockContentCalendar, mockUsers, ContentCalendarItem, User, parsePicIds } from "@/lib/mock-data";
 import { sendGmail } from "@/lib/mail/mailer";
 import { generateReminderEmailHtml, ReminderContentData } from "@/lib/mail/template";
 
@@ -95,11 +95,7 @@ async function handleReminder(request: Request) {
     const picContentsMap = new Map<string, ReminderContentData[]>();
 
     for (const item of targetItems) {
-      const pics: string[] = Array.isArray(item.pic)
-        ? item.pic
-        : typeof item.pic === "string"
-        ? [item.pic]
-        : [];
+      const pics: string[] = parsePicIds(item.pic);
 
       for (const picId of pics) {
         if (!picId) continue;

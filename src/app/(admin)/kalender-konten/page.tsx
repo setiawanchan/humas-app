@@ -9,6 +9,7 @@ import {
   ContentCalendarItem,
   User,
   mockUsers,
+  parsePicIds,
 } from "@/lib/mock-data";
 import { Modal } from "@/components/ui/modal";
 import { getUsersFromSupabase } from "@/lib/supabase/user-service";
@@ -99,13 +100,13 @@ const formatToISO = (dateStr: string) => {
   return dateStr;
 };
 
-// Helper Nama PIC (Support single string atau array of IDs)
+// Helper Nama PIC (Support single string, JSON string, atau array of IDs)
 const getPicNames = (
   pic: string | string[] | undefined,
   userList?: User[]
 ): string[] => {
-  if (!pic) return ["-"];
-  const ids = Array.isArray(pic) ? pic : [pic];
+  const ids = parsePicIds(pic);
+  if (ids.length === 0) return ["-"];
   const source = userList && userList.length > 0 ? userList : mockUsers;
   return ids.map((id) => {
     const user = source.find((u) => u.id === id);

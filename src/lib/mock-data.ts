@@ -47,6 +47,31 @@ export interface ContentCalendarItem {
   pic: string | string[]; // user id atau array of user id
 }
 
+// Helper untuk parsing pic yang fleksibel (array, JSON string, atau string biasa)
+export function parsePicIds(pic: string | string[] | undefined | null): string[] {
+  if (!pic) return [];
+  if (Array.isArray(pic)) return pic.filter(Boolean);
+  if (typeof pic === "string") {
+    const trimmed = pic.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed.map((s) => String(s).trim()).filter(Boolean);
+      } catch {
+        // Abaikan jika JSON parse gagal, gunakan fallback regex di bawah
+      }
+    }
+    // Fallback: hapus karakter [ ] " ' dan split koma
+    return trimmed
+      .replace(/[\[\]"'\\]/g, "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export const mockContentCalendar: ContentCalendarItem[] = [];
 
 export interface QuizField {
