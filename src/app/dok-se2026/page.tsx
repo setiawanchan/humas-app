@@ -6,6 +6,11 @@ import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
 import { mockDokseData, DokseItem } from "@/lib/dokse-data";
 import { Modal } from "@/components/ui/modal";
+import {
+  getDokseDataFromSupabase,
+  updateDokseItemInSupabase,
+  bulkInsertDokseDataToSupabase,
+} from "@/lib/supabase/dokse-service";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -13,7 +18,26 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), {
 
 export default function Dokse2026Page() {
   // State Data Utama Dokse 2026
-  const [dataList, setDataList] = useState<DokseItem[]>(mockDokseData);
+  const [dataList, setDataList] = useState<DokseItem[]>([]);
+  const [isLoadingSupabase, setIsLoadingSupabase] = useState(true);
+
+  // Load Data dari Supabase saat Komponen Dimuat
+  useEffect(() => {
+    async function loadData() {
+      setIsLoadingSupabase(true);
+      const remoteData = await getDokseDataFromSupabase();
+      if (remoteData && remoteData.length > 0) {
+        setDataList(remoteData);
+      } else {
+        // Seeding awal jika database Supabase masih kosong
+        setDataList(mockDokseData);
+        await bulkInsertDokseDataToSupabase(mockDokseData);
+      }
+      setIsLoadingSupabase(false);
+    }
+
+    loadData();
+  }, []);
 
   // State Admin / Login Mode (Default: View Only)
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -400,23 +424,30 @@ export default function Dokse2026Page() {
 
   // Handler Update Kolom Pengecekan
   // CATATAN KHUSUS: Jika Peta Desa diubah, maka seluruh SLS dalam desa yang sama otomatis ikut berubah!
-  const handleUpdateItem = (idsubsls: string, field: keyof DokseItem, value: string) => {
+  const handleUpdateItem = async (idsubsls: string, field: keyof DokseItem, value: string) => {
     const targetItem = dataList.find((d) => d.idsubsls === idsubsls);
     if (!targetItem) return;
 
     if (field === "peta_desa") {
       const targetKodeDesa = targetItem.kode_desa;
-      setDataList((prev) =>
-        prev.map((item) =>
-          item.kode_desa === targetKodeDesa
-            ? { ...item, peta_desa: value as "Ada" | "Tidak" | "-" }
-            : item
-        )
+      const updatedList = dataList.map((item) =>
+        item.kode_desa === targetKodeDesa
+          ? { ...item, peta_desa: value as "Ada" | "Tidak" | "-" }
+          : item
       );
+      setDataList(updatedList);
+
+      // Batch sync items of the same village to Supabase
+      const affectedItems = updatedList.filter((item) => item.kode_desa === targetKodeDesa);
+      await bulkInsertDokseDataToSupabase(affectedItems);
     } else {
+      const updatedItem = { ...targetItem, [field]: value };
       setDataList((prev) =>
-        prev.map((item) => (item.idsubsls === idsubsls ? { ...item, [field]: value } : item))
+        prev.map((item) => (item.idsubsls === idsubsls ? updatedItem : item))
       );
+
+      // Single item sync to Supabase
+      await updateDokseItemInSupabase(updatedItem);
     }
   };
 
@@ -477,15 +508,16 @@ export default function Dokse2026Page() {
   };
 
   // Handler Simple Import Data (JSON / CSV Format Text)
-  const handleImportSubmit = (e: React.FormEvent) => {
+  const handleImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const parsed = JSON.parse(importText);
       if (Array.isArray(parsed)) {
         setDataList(parsed);
+        await bulkInsertDokseDataToSupabase(parsed);
         setIsImportModalOpen(false);
         setImportText("");
-        alert("Berhasil mengunggah data baru!");
+        alert("Berhasil mengunggah & menyinkronkan data ke Supabase!");
       }
     } catch {
       alert("Format data tidak valid! Harap masukkan data JSON array yang sesuai.");
@@ -534,11 +566,16 @@ export default function Dokse2026Page() {
 
             {/* Tombol Refresh */}
             <button
-              onClick={() => setDataList([...mockDokseData])}
+              onClick={async () => {
+                setIsLoadingSupabase(true);
+                const remote = await getDokseDataFromSupabase();
+                if (remote && remote.length > 0) setDataList(remote);
+                setIsLoadingSupabase(false);
+              }}
               className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1"
-              title="Refresh Data"
+              title="Refresh Data dari Supabase"
             >
-              🔄 Refresh
+              🔄 {isLoadingSupabase ? "Loading..." : "Refresh"}
             </button>
 
             {/* Tombol Unduh Excel (Untuk Semua User) */}
