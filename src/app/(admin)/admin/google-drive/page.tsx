@@ -9,6 +9,31 @@ export default function GoogleDriveAdminPage() {
   const isAdmin = currentUser?.role === "administrator";
 
   const [copiedVar, setCopiedVar] = useState<string | null>(null);
+  const [driveStatus, setDriveStatus] = useState<any>(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+
+  const checkDriveStatus = async () => {
+    setCheckingStatus(true);
+    try {
+      const res = await fetch("/api/auth/google/status");
+      const data = await res.json();
+      setDriveStatus(data);
+    } catch (err) {
+      setDriveStatus({
+        connected: false,
+        message: "Gagal menghubungi server untuk cek status.",
+      });
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  // Cek status secara otomatis saat pertama kali dibuka
+  React.useEffect(() => {
+    if (isAdmin) {
+      checkDriveStatus();
+    }
+  }, [isAdmin]);
 
   const copyToClipboard = (text: string, varName: string) => {
     navigator.clipboard.writeText(text);
@@ -40,12 +65,33 @@ export default function GoogleDriveAdminPage() {
         </p>
       </div>
 
-      {/* Action Card: Connect Button */}
-      <div className="rounded-2xl border border-orange-200 dark:border-orange-900/60 bg-gradient-to-br from-orange-50/50 to-amber-50/30 dark:from-orange-950/20 dark:to-amber-950/10 p-6 shadow-sm">
+      {/* Action Card: Connect Button & Live Status */}
+      <div className="rounded-2xl border border-orange-200 dark:border-orange-900/60 bg-gradient-to-br from-orange-50/50 to-amber-50/30 dark:from-orange-950/20 dark:to-amber-950/10 p-6 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/60 text-orange-700 dark:text-orange-300 text-xs font-semibold">
-              <span>⚡</span> OAuth 2.0 Admin Setup
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/60 text-orange-700 dark:text-orange-300 text-xs font-semibold">
+                ⚡ OAuth 2.0 Admin Setup
+              </span>
+              {checkingStatus ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium">
+                  <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Memeriksa koneksi...
+                </span>
+              ) : driveStatus?.connected ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Terhubung ({driveStatus.user?.emailAddress || "Google Drive"})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 text-xs font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                  Belum Terhubung
+                </span>
+              )}
             </div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               Hubungkan / Otorisasi Akun Google Drive
@@ -55,16 +101,69 @@ export default function GoogleDriveAdminPage() {
             </p>
           </div>
 
-          <a
-            href="/api/auth/google"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-6 py-3 font-semibold text-sm shadow-md hover:shadow-lg transition duration-200 cursor-pointer shrink-0"
-          >
-            <span>🔑</span>
-            <span>Mulai Otorisasi Akun Google</span>
-          </a>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={checkDriveStatus}
+              disabled={checkingStatus}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 px-4 py-3 font-semibold text-xs text-gray-700 dark:text-gray-200 shadow-sm transition disabled:opacity-50 cursor-pointer"
+            >
+              🔄 Cek Status
+            </button>
+            <a
+              href="/api/auth/google"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-5 py-3 font-semibold text-xs shadow-md hover:shadow-lg transition duration-200 cursor-pointer"
+            >
+              <span>🔑</span>
+              <span>Mulai Otorisasi</span>
+            </a>
+          </div>
         </div>
+
+        {/* Info detail hasil tes koneksi */}
+        {driveStatus && (
+          <div className={`p-4 rounded-xl text-xs border ${
+            driveStatus.connected
+              ? "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-200"
+              : "bg-amber-50/70 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/40 text-amber-900 dark:text-amber-200"
+          }`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold mb-1 flex items-center gap-2">
+                  <span>{driveStatus.connected ? "✅" : "⚠️"}</span>
+                  <span>{driveStatus.message}</span>
+                </div>
+                {driveStatus.user && (
+                  <p className="text-[11px] opacity-80">
+                    Akun: <strong>{driveStatus.user.displayName}</strong> ({driveStatus.user.emailAddress})
+                  </p>
+                )}
+                {driveStatus.parentFolderInfo && (
+                  <p className="text-[11px] opacity-80 mt-0.5">
+                    Parent Folder: {driveStatus.parentFolderInfo.name ? (
+                      <strong className="font-mono">{driveStatus.parentFolderInfo.name}</strong>
+                    ) : (
+                      <span className="text-rose-600 dark:text-rose-400">{driveStatus.parentFolderInfo.warning}</span>
+                    )}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5 shrink-0 text-[10px]">
+                <span className={`px-2 py-0.5 rounded font-mono ${driveStatus.envStatus?.hasClientId ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" : "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200"}`}>
+                  CLIENT_ID: {driveStatus.envStatus?.hasClientId ? "✓" : "✗"}
+                </span>
+                <span className={`px-2 py-0.5 rounded font-mono ${driveStatus.envStatus?.hasClientSecret ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" : "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200"}`}>
+                  CLIENT_SECRET: {driveStatus.envStatus?.hasClientSecret ? "✓" : "✗"}
+                </span>
+                <span className={`px-2 py-0.5 rounded font-mono ${driveStatus.envStatus?.hasRefreshToken ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" : "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200"}`}>
+                  REFRESH_TOKEN: {driveStatus.envStatus?.hasRefreshToken ? "✓" : "✗"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Structure Guide */}
