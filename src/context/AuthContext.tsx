@@ -1,7 +1,13 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { User, mockUsers } from "@/lib/mock-data";
+import { User } from "@/lib/mock-data";
+import {
+  getUsersFromSupabase,
+  insertUserToSupabase,
+  updateUserInSupabase,
+  deleteUserFromSupabase,
+} from "@/lib/supabase/user-service";
 
 interface AuthContextType {
   currentUser: User | null;
@@ -21,24 +27,38 @@ const STORAGE_KEY = "humas_app_user_id";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [usersList, setUsersList] = useState<User[]>(mockUsers);
+  const [usersList, setUsersList] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Initial load from localStorage
-    const savedUserId = localStorage.getItem(STORAGE_KEY);
-    if (savedUserId) {
-      const found = usersList.find((u) => u.id === savedUserId);
-      if (found) {
-        setCurrentUser(found);
+    async function initUsers() {
+      setIsLoading(true);
+      const remoteUsers = await getUsersFromSupabase();
+      setUsersList(remoteUsers || []);
+
+      const savedUserId = localStorage.getItem(STORAGE_KEY);
+      if (savedUserId && remoteUsers.length > 0) {
+        const found = remoteUsers.find((u) => u.id === savedUserId);
+        if (found) setCurrentUser(found);
+        else setCurrentUser(remoteUsers[0] || null);
+      } else if (remoteUsers.length > 0) {
+        setCurrentUser(remoteUsers[0]);
+        localStorage.setItem(STORAGE_KEY, remoteUsers[0].id);
       } else {
-        setCurrentUser(usersList[2]); // Default to Rudi Hartono (admin)
+        // Fallback default admin jika database user Supabase belum diisi
+        const defaultAdmin: User = {
+          id: "admin-default",
+          email: "admin@bps.go.id",
+          nama: "Administrator Humas",
+          role: "administrator",
+          is_active: true,
+        };
+        setCurrentUser(defaultAdmin);
       }
-    } else {
-      setCurrentUser(usersList[2]);
-      localStorage.setItem(STORAGE_KEY, usersList[2].id);
+      setIsLoading(false);
     }
-    setIsLoading(false);
+
+    initUsers();
   }, []);
 
   const login = (userId: string) => {
@@ -54,34 +74,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem(STORAGE_KEY);
   };
 
-  const addUser = (userData: Omit<User, "id">) => {
-    const newUser: User = {
-      ...userData,
-      id: `u_${Date.now()}`,
-    };
-    setUsersList((prev) => [...prev, newUser]);
+  const addUser = async (userData: Omit<User, "id">) => {
+    const created = await insertUserToSupabase(userData);
+    if (created) {
+      setUsersList((prev) => [...prev, created]);
+    }
   };
 
-  const updateUser = (id: string, updatedData: Partial<User>) => {
+  const updateUser = async (id: string, updatedData: Partial<User>) => {
     setUsersList((prev) =>
       prev.map((u) => (u.id === id ? { ...u, ...updatedData } : u))
     );
     if (currentUser?.id === id) {
       setCurrentUser((prev) => (prev ? { ...prev, ...updatedData } : prev));
     }
+    await updateUserInSupabase(id, updatedData);
   };
 
-  const toggleUserStatus = (id: string) => {
+  const toggleUserStatus = async (id: string) => {
+    const target = usersList.find((u) => u.id === id);
+    if (!target) return;
+    const newStatus = !target.is_active;
+
     setUsersList((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, is_active: !u.is_active } : u))
+      prev.map((u) => (u.id === id ? { ...u, is_active: newStatus } : u))
     );
     if (currentUser?.id === id) {
-      setCurrentUser((prev) => (prev ? { ...prev, is_active: !prev.is_active } : prev));
+      setCurrentUser((prev) => (prev ? { ...prev, is_active: newStatus } : prev));
     }
+    await updateUserInSupabase(id, { is_active: newStatus });
   };
 
-  const deleteUser = (id: string) => {
+  const deleteUser = async (id: string) => {
     setUsersList((prev) => prev.filter((u) => u.id !== id));
+    await deleteUserFromSupabase(id);
   };
 
   return (
