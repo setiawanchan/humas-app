@@ -6,9 +6,17 @@ import "flatpickr/dist/flatpickr.css";
 import { useAuth } from "@/context/AuthContext";
 import { mockArsip, Arsip } from "@/lib/mock-data";
 import { Modal } from "@/components/ui/modal";
+import {
+  getArsipFromSupabase,
+  insertArsipToSupabase,
+  updateArsipInSupabase,
+  deleteArsipFromSupabase,
+  ArsipItem,
+} from "@/lib/supabase/kalender-service";
 
 type SortColumn = "judul" | "tanggal";
 type SortDirection = "asc" | "desc";
+
 
 // Category badge label & styling helper
 const getCategoryBadge = (kategori: Arsip["kategori"]) => {
@@ -110,8 +118,29 @@ export default function ArsipPage() {
   const canManage =
     currentUser?.role === "administrator" || currentUser?.role === "admin_humas";
 
-  // State data arsip (lokal React state)
+  // State data arsip
   const [items, setItems] = useState<Arsip[]>(mockArsip);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const remote = await getArsipFromSupabase();
+        if (remote && remote.length > 0) {
+          setItems(remote as unknown as Arsip[]);
+        } else {
+          setItems(mockArsip);
+        }
+      } catch (err) {
+        console.error("Error loading arsip from Supabase:", err);
+        setItems(mockArsip);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   // State Search & Filter
   const currentDate = new Date();
@@ -127,14 +156,25 @@ export default function ArsipPage() {
   // State Modal Form (Tambah / Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Arsip | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    judul: string;
+    kategori: Arsip["kategori"];
+    deskripsi: string;
+    tanggal: string;
+    tags: string;
+    uploadedFilesName: string;
+    selectedFiles: File[];
+  }>({
     judul: "",
     kategori: "sk" as Arsip["kategori"],
     deskripsi: "",
     tanggal: new Date().toISOString().split("T")[0],
     tags: "",
     uploadedFilesName: "",
+    selectedFiles: [],
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadStatusText, setUploadStatusText] = useState("");
 
   // State Modal Detail Item
   const [detailItem, setDetailItem] = useState<Arsip | null>(null);
@@ -291,7 +331,9 @@ export default function ArsipPage() {
       tanggal: new Date().toISOString().split("T")[0],
       tags: "",
       uploadedFilesName: "",
+      selectedFiles: [],
     });
+    setUploadStatusText("");
     setIsFormOpen(true);
   };
 
@@ -304,60 +346,123 @@ export default function ArsipPage() {
       kategori: item.kategori,
       deskripsi: item.deskripsi,
       tanggal: item.tanggal,
-      tags: item.tags.join(", "),
+      tags: (item.tags || []).join(", "),
       uploadedFilesName: "",
+      selectedFiles: [],
     });
+    setUploadStatusText("");
     setIsFormOpen(true);
   };
 
   // Submit Form (Tambah / Edit)
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
     const parsedTags = formData.tags
       ? formData.tags.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean)
       : [];
 
-    if (editingItem) {
-      // Edit mode
-      // TODO: Replace with Supabase update query (supabase.from('arsip').update(...).eq('id', editingItem.id))
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === editingItem.id
-            ? {
-                ...item,
-                judul: formData.judul,
-                kategori: formData.kategori,
-                deskripsi: formData.deskripsi,
-                tanggal: formData.tanggal,
-                tags: parsedTags,
-              }
-            : item
-        )
-      );
-    } else {
-      // Create mode
-      const slug = formData.judul
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
-      const generatedDriveUrl = `https://drive.google.com/drive/u/0/folders/bps-lebak-arsip-${slug || Date.now()}`;
+    try {
+      if (editingItem) {
+        // Edit mode: Update Supabase
+        const payload: Partial<ArsipItem> = {
+          judul: formData.judul,
+          kategori: formData.kategori,
+          deskripsi: formData.deskripsi,
+          tanggal: formData.tanggal,
+          tags: parsedTags,
+        };
 
-      // TODO: Replace with Supabase insert query (supabase.from('arsip').insert(...))
-      const newItem: Arsip = {
-        id: `a_${Date.now()}`,
-        judul: formData.judul,
-        kategori: formData.kategori,
-        deskripsi: formData.deskripsi,
-        tanggal: formData.tanggal,
-        tags: parsedTags,
-        drive_url: generatedDriveUrl,
-        uploaded_by: currentUser?.id || "u3",
-      };
-      setItems((prev) => [newItem, ...prev]);
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === editingItem.id
+              ? {
+                  ...item,
+                  ...payload,
+                }
+              : item
+          )
+        );
+
+        setIsFormOpen(false);
+        await updateArsipInSupabase(editingItem.id, payload);
+      } else {
+        // Create mode: Upload ke Google Drive via /api/upload-drive dengan hirarki Arsip -> Tahun -> Bulan -> Judul
+        setUploadStatusText("Membuat folder Arsip di Google Drive & mengunggah dokumen...");
+
+        let driveUrl = "";
+        try {
+          const driveBody = new FormData();
+          driveBody.append("judul", formData.judul);
+          driveBody.append("tanggal", formData.tanggal);
+          driveBody.append("module", "arsip");
+          if (formData.selectedFiles && formData.selectedFiles.length > 0) {
+            formData.selectedFiles.forEach((file) => {
+              driveBody.append("files", file);
+            });
+          }
+
+          const uploadRes = await fetch("/api/upload-drive", {
+            method: "POST",
+            body: driveBody,
+          });
+
+          const uploadData = await uploadRes.json();
+          if (uploadData && uploadData.drive_url) {
+            driveUrl = uploadData.drive_url;
+          }
+        } catch (uploadErr) {
+          console.warn("Upload ke Google Drive API fallback:", uploadErr);
+        }
+
+        if (!driveUrl) {
+          const slug = formData.judul
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "");
+          driveUrl = `https://drive.google.com/drive/u/0/folders/bps-lebak-arsip-${slug || Date.now()}`;
+        }
+
+        const payload: Omit<ArsipItem, "id"> = {
+          judul: formData.judul,
+          kategori: formData.kategori,
+          deskripsi: formData.deskripsi,
+          tanggal: formData.tanggal,
+          tags: parsedTags,
+          drive_url: driveUrl,
+          uploaded_by: currentUser?.nama || currentUser?.id || "Admin",
+        };
+
+        const tempItem: Arsip = {
+          id: `temp_${Date.now()}`,
+          judul: payload.judul,
+          kategori: payload.kategori,
+          deskripsi: payload.deskripsi || "",
+          tanggal: payload.tanggal,
+          tags: parsedTags,
+          drive_url: driveUrl,
+          uploaded_by: payload.uploaded_by || "",
+        };
+
+        setItems((prev) => [tempItem, ...prev]);
+        setIsFormOpen(false);
+
+        const inserted = await insertArsipToSupabase(payload);
+        if (inserted && inserted.id) {
+          setItems((prev) =>
+            prev.map((item) =>
+              item.id === tempItem.id ? (inserted as unknown as Arsip) : item
+            )
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Error submitting arsip:", err);
+    } finally {
+      setIsSubmitting(false);
+      setUploadStatusText("");
     }
-
-    setIsFormOpen(false);
   };
 
   // Trigger Hapus
@@ -367,12 +472,15 @@ export default function ArsipPage() {
   };
 
   // Confirm Hapus
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingItem) return;
-    // TODO: Replace with Supabase delete query (supabase.from('arsip').delete().eq('id', deletingItem.id))
-    setItems((prev) => prev.filter((i) => i.id !== deletingItem.id));
+    const targetId = deletingItem.id;
+    setItems((prev) => prev.filter((i) => i.id !== targetId));
     setDeletingItem(null);
+
+    await deleteArsipFromSupabase(targetId);
   };
+
 
   return (
     <div className="space-y-6">
@@ -828,17 +936,19 @@ export default function ArsipPage() {
                   <input
                     type="file"
                     multiple
+                    disabled={isSubmitting}
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
                       if (files.length > 0) {
                         const fileNames = files.map((f) => f.name).join(", ");
                         setFormData((prev) => ({
                           ...prev,
+                          selectedFiles: files,
                           uploadedFilesName: `${files.length} file dipilih (${fileNames.slice(0, 40)}${fileNames.length > 40 ? "..." : ""})`,
                         }));
                       }
                     }}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                   />
                   <div className="flex flex-col items-center justify-center gap-1.5 pointer-events-none">
                     <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -848,7 +958,7 @@ export default function ArsipPage() {
                       Klik atau seret file dokumen ke sini untuk upload
                     </p>
                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      File akan disimpan dan link Google Drive akan otomatis tersinkronisasi.
+                      File akan disimpan ke folder Arsip di Google Drive dan URL tersinkronisasi otomatis.
                     </p>
                     {formData.uploadedFilesName && (
                       <span className="mt-1 px-2.5 py-1 rounded-md bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300 text-xs font-medium">
@@ -859,19 +969,43 @@ export default function ArsipPage() {
                 </div>
               </div>
 
+              {isSubmitting && uploadStatusText && (
+                <div className="p-3 bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800/40 rounded-xl flex items-center gap-2.5 text-xs text-brand-700 dark:text-brand-300">
+                  <svg className="animate-spin h-4 w-4 text-brand-600" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>{uploadStatusText}</span>
+                </div>
+              )}
+
               <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 dark:border-gray-700">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setIsFormOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-semibold transition cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow transition cursor-pointer"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow transition cursor-pointer disabled:opacity-50 flex items-center gap-2"
                 >
-                  {editingItem ? "Simpan Perubahan" : "Upload & Generate Link Drive"}
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Menyimpan...
+                    </>
+                  ) : editingItem ? (
+                    "Simpan Perubahan"
+                  ) : (
+                    "Upload & Simpan ke Drive"
+                  )}
                 </button>
               </div>
             </form>

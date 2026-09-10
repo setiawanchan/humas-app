@@ -114,4 +114,73 @@ export async function deleteDokumentasiFromSupabase(id: string): Promise<boolean
   return true;
 }
 
+// ======================= CRUD ARSIP DOKUMEN KANTOR =======================
+export interface ArsipItem {
+  id?: string;
+  judul: string;
+  kategori: "sk" | "logo_aset" | "template_laporan" | "lainnya";
+  deskripsi?: string;
+  tanggal: string;
+  tags?: string[];
+  drive_url?: string;
+  uploaded_by?: string;
+  created_at?: string;
+}
+
+export async function getArsipFromSupabase(): Promise<ArsipItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from("arsip")
+      .select("*")
+      .order("tanggal", { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      return data as ArsipItem[];
+    }
+  } catch (err) {
+    console.warn("Supabase arsip fetch error:", err);
+  }
+  return [];
+}
+
+export async function insertArsipToSupabase(item: Omit<ArsipItem, "id">): Promise<ArsipItem | null> {
+  const { data, error } = await supabase
+    .from("arsip")
+    .insert(item)
+    .select();
+
+  if (error) {
+    console.error("Error inserting arsip:", error);
+    return null;
+  }
+  return data?.[0] as ArsipItem;
+}
+
+export async function updateArsipInSupabase(id: string, updatedData: Partial<ArsipItem>): Promise<boolean> {
+  const { error } = await supabase
+    .from("arsip")
+    .update(updatedData)
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error updating arsip:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteArsipFromSupabase(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("arsip")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting arsip:", error);
+    return false;
+  }
+  return true;
+}
+
+
 

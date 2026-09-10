@@ -481,28 +481,15 @@ export default function DokumentasiPage() {
         </div>
 
         {canManage && (
-          <div className="flex items-center gap-2.5">
-            <a
-              href="/api/auth/google"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Hubungkan akun Google Drive admin untuk mengaktifkan upload otomatis"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-3.5 py-3 font-semibold text-xs shadow-sm transition duration-200 cursor-pointer"
-            >
-              <span className="text-base">🔑</span>
-              <span>Hubungkan Drive</span>
-            </a>
-
-            <button
-              onClick={handleOpenCreateForm}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-5 py-3 font-semibold text-sm shadow-md hover:shadow-lg transition duration-200 cursor-pointer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-              </svg>
-              Tambah Dokumentasi
-            </button>
-          </div>
+          <button
+            onClick={handleOpenCreateForm}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-5 py-3 font-semibold text-sm shadow-md hover:shadow-lg transition duration-200 cursor-pointer"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Tambah Dokumentasi
+          </button>
         )}
       </div>
 

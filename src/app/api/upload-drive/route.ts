@@ -10,12 +10,13 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const judul = formData.get("judul") as string;
-    const tanggal = formData.get("tanggal_kegiatan") as string;
+    const tanggal = (formData.get("tanggal_kegiatan") || formData.get("tanggal")) as string;
+    const moduleType = ((formData.get("module") as string) || "dokumentasi") as "dokumentasi" | "arsip";
     const files = formData.getAll("files") as File[];
 
     if (!judul || !tanggal) {
       return NextResponse.json(
-        { error: "Judul kegiatan dan tanggal wajib diisi." },
+        { error: "Judul dan tanggal wajib diisi." },
         { status: 400 }
       );
     }
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "");
-      const simulatedDriveUrl = `https://drive.google.com/drive/u/0/folders/bps-lebak-${slug || Date.now()}`;
+      const simulatedDriveUrl = `https://drive.google.com/drive/u/0/folders/bps-lebak-${moduleType}-${slug || Date.now()}`;
 
       return NextResponse.json({
         success: true,
@@ -39,10 +40,13 @@ export async function POST(request: Request) {
       });
     }
 
-    // 1. Buat struktur folder hirarkis di Google Drive: Tahun -> Bulan -> YYYYMMDD_JudulKegiatan
+    // 1. Buat struktur folder hirarkis di Google Drive:
+    // Dokumentasi: [Parent] -> [Tahun] -> [Bulan] -> [Kegiatan]
+    // Arsip:       [Parent] -> [Arsip] -> [Tahun] -> [Bulan] -> [Kegiatan]
     const { folderId, webViewLink } = await createActivityFolderHierarchy(
       tanggal,
-      judul
+      judul,
+      moduleType
     );
 
     // 2. Upload setiap file ke dalam folder kegiatan

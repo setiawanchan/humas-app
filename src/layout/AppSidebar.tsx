@@ -57,6 +57,7 @@ export default function AppSidebar() {
       subItems: [
         { name: "Manajemen User", path: "/admin/users" },
         { name: "Manajemen Halaman & Akses", path: "/admin/halaman-akses" },
+        { name: "Integrasi Google Drive", path: "/admin/google-drive" },
       ],
     },
   ];

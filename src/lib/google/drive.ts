@@ -158,12 +158,23 @@ export function formatActivityFolderName(dateStr: string, title: string): string
   return `${yyyymmdd}_${cleanTitle}`;
 }
 
-// 3. Buat Hirarki Folder: [Parent] -> [Tahun] -> [Bulan] -> [Kegiatan]
+// 3. Buat Hirarki Folder:
+// Dokumentasi: [Parent] -> [Tahun] -> [Bulan] -> [Kegiatan]
+// Arsip:       [Parent] -> [Arsip] -> [Tahun] -> [Bulan] -> [Kegiatan]
 export async function createActivityFolderHierarchy(
   dateStr: string,
-  title: string
+  title: string,
+  moduleType: "dokumentasi" | "arsip" = "dokumentasi"
 ): Promise<{ folderId: string; webViewLink: string }> {
-  const parentFolderId = process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID || undefined;
+  const rootParentFolderId = process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID || undefined;
+
+  let baseParentId = rootParentFolderId;
+
+  // Jika modul Arsip, pastikan ada folder khusus "Arsip" di level teratas
+  if (moduleType === "arsip") {
+    const arsipRootFolder = await getOrCreateFolder("Arsip", rootParentFolderId);
+    baseParentId = arsipRootFolder.id;
+  }
 
   let yearStr = new Date().getFullYear().toString();
   const d = new Date(dateStr);
@@ -174,13 +185,13 @@ export async function createActivityFolderHierarchy(
   const monthFolderStr = getMonthFolderName(dateStr);
   const activityFolderStr = formatActivityFolderName(dateStr, title);
 
-  // 1. Folder Tahun (misal: 2026)
-  const yearFolder = await getOrCreateFolder(yearStr, parentFolderId);
+  // 1. Folder Tahun (misal: 2026) di dalam folder induk terkait
+  const yearFolder = await getOrCreateFolder(yearStr, baseParentId);
 
   // 2. Folder Bulan (misal: 01.Januari) di dalam folder Tahun
   const monthFolder = await getOrCreateFolder(monthFolderStr, yearFolder.id);
 
-  // 3. Folder Kegiatan (misal: 20260112_Pelatihan Calangmen) di dalam folder Bulan
+  // 3. Folder Kegiatan/Arsip (misal: 20260112_Judul) di dalam folder Bulan
   const activityFolder = await getOrCreateFolder(activityFolderStr, monthFolder.id);
 
   const folderUrl =
