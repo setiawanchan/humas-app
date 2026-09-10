@@ -87,10 +87,19 @@ const formatToISO = (dateStr: string) => {
   return dateStr;
 };
 
-// Helper Nama PIC
-const getPicName = (picId: string) => {
-  const user = mockUsers.find((u) => u.id === picId);
-  return user ? user.nama : picId;
+// Helper Nama PIC (Support single string atau array of IDs)
+const getPicNames = (pic: string | string[] | undefined): string[] => {
+  if (!pic) return ["-"];
+  const ids = Array.isArray(pic) ? pic : [pic];
+  return ids.map((id) => {
+    const user = mockUsers.find((u) => u.id === id);
+    return user ? user.nama : id;
+  });
+};
+
+const getPicName = (pic: string | string[] | undefined): string => {
+  const names = getPicNames(pic);
+  return names.join(", ");
 };
 
 // Helper Styling Badge Status
@@ -185,7 +194,7 @@ export default function KalenderKontenPage() {
   // State Copy Caption Feedback
   const [isCopied, setIsCopied] = useState(false);
 
-  // State Form Input
+  // State Form Input (Support Multiple PIC)
   const [formData, setFormData] = useState({
     judul: "",
     selectedPlatforms: ["instagram"] as ContentCalendarItem["platform"][], // Multi-select untuk Create mode
@@ -195,11 +204,15 @@ export default function KalenderKontenPage() {
     drive_link_bahan: "",
     deskripsi: "",
     caption: "",
-    pic: currentUser?.id || "u2",
+    pic: [currentUser?.id || "u2"] as string[], // Multi-select array user IDs
   });
 
   // State Modal Konfirmasi Hapus
   const [deletingItem, setDeletingItem] = useState<ContentCalendarItem | null>(null);
+
+  // State Notifikasi Pengingat Hari Ini
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [reminderResult, setReminderResult] = useState<any>(null);
 
   // Ref Flatpickr Date Picker
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -350,6 +363,25 @@ export default function KalenderKontenPage() {
     });
   };
 
+  // Toggle Checkbox PIC
+  const handlePicCheckboxToggle = (userId: string) => {
+    setFormData((prev) => {
+      const exists = prev.pic.includes(userId);
+      if (exists) {
+        if (prev.pic.length === 1) return prev; // Minimal 1 PIC terpilih
+        return {
+          ...prev,
+          pic: prev.pic.filter((id) => id !== userId),
+        };
+      } else {
+        return {
+          ...prev,
+          pic: [...prev.pic, userId],
+        };
+      }
+    });
+  };
+
   // Open Form Modal (Tambah Baru)
   const handleOpenCreateForm = (initialDateStr?: string) => {
     setEditingItem(null);
@@ -362,7 +394,7 @@ export default function KalenderKontenPage() {
       drive_link_bahan: "",
       deskripsi: "",
       caption: "",
-      pic: currentUser?.id || "u2",
+      pic: [currentUser?.id || "u2"],
     });
     setIsFormOpen(true);
   };
@@ -371,6 +403,7 @@ export default function KalenderKontenPage() {
   const handleOpenEditForm = (item: ContentCalendarItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setEditingItem(item);
+    const picArray = Array.isArray(item.pic) ? item.pic : [item.pic || currentUser?.id || "u2"];
     setFormData({
       judul: item.judul,
       selectedPlatforms: [item.platform],
@@ -380,7 +413,7 @@ export default function KalenderKontenPage() {
       drive_link_bahan: item.drive_link_bahan || "",
       deskripsi: item.deskripsi,
       caption: item.caption || "",
-      pic: item.pic,
+      pic: picArray,
     });
     setSelectedItem(null);
     setIsFormOpen(true);
@@ -394,6 +427,26 @@ export default function KalenderKontenPage() {
       prev.map((i) => (i.id === selectedItem.id ? { ...i, status: newStatus } : i))
     );
     setSelectedItem((prev) => (prev ? { ...prev, status: newStatus } : null));
+  };
+
+  // Handler Trigger Manual Pengingat Hari Ini ke Gmail PIC
+  const handleSendTodayReminders = async () => {
+    setIsSendingReminder(true);
+    setReminderResult(null);
+    try {
+      const res = await fetch("/api/cron/reminder-konten", {
+        method: "POST",
+      });
+      const data = await res.json();
+      setReminderResult(data);
+    } catch (err: any) {
+      setReminderResult({
+        success: false,
+        error: err?.message || "Gagal menghubungi server pengingat.",
+      });
+    } finally {
+      setIsSendingReminder(false);
+    }
   };
 
   // Submit Form Tambah / Edit
@@ -508,18 +561,88 @@ export default function KalenderKontenPage() {
           </div>
 
           {canManage && (
-            <button
-              onClick={() => handleOpenCreateForm()}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 font-semibold text-sm shadow-md transition cursor-pointer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-              </svg>
-              + Tambah Konten
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSendTodayReminders}
+                disabled={isSendingReminder}
+                title="Kirim notifikasi email pengingat otomatis ke Gmail masing-masing PIC yang punya jadwal konten hari ini"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/80 text-sky-700 dark:text-sky-300 px-3.5 py-2.5 font-semibold text-xs shadow-xs transition cursor-pointer disabled:opacity-50"
+              >
+                {isSendingReminder ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Mengirim...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✉️</span>
+                    <span>Kirim Pengingat Hari Ini</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleOpenCreateForm()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 font-semibold text-sm shadow-md transition cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                + Tambah Konten
+              </button>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Alert Feedback Hasil Kirim Pengingat Hari Ini */}
+      {reminderResult && (
+        <div
+          className={`rounded-xl p-4 border text-xs transition relative flex items-start justify-between gap-3 ${
+            reminderResult.success
+              ? "bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-200"
+              : "bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-200"
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="font-bold flex items-center gap-1.5">
+              <span>{reminderResult.success ? "✅" : "⚠️"}</span>
+              <span>{reminderResult.success ? "Pengiriman Pengingat Selesai" : "Pengiriman Gagal"}</span>
+            </div>
+            <p className="opacity-90">
+              {reminderResult.message ||
+                `Berhasil mengirim ${reminderResult.emailsSent || 0} email dari ${
+                  reminderResult.totalPicsInvolved || 0
+                } PIC untuk ${reminderResult.totalContentsFound || 0} konten jadwal hari ini (${
+                  reminderResult.targetDate || "-"
+                }).`}
+            </p>
+            {reminderResult.details && reminderResult.details.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {reminderResult.details.map((d: any, idx: number) => (
+                  <div key={idx} className="flex items-center gap-2 text-[11px]">
+                    <span className={d.success ? "text-emerald-700 font-bold dark:text-emerald-400" : "text-rose-600 font-bold dark:text-rose-400"}>
+                      {d.success ? "✓" : "✗"}
+                    </span>
+                    <span className="font-semibold">{d.nama}</span>
+                    <span className="opacity-75">({d.email})</span>:
+                    <span className="italic">{d.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setReminderResult(null)}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm font-bold cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Top Highlight Banner Ringkas Pengingat Konten 1 Minggu Terdekat */}
       {items.length > 0 && (
@@ -812,8 +935,17 @@ export default function KalenderKontenPage() {
                           {getPlatformLabel(item.platform)}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        {getPicName(item.pic)}
+                      <td className="py-3.5 px-4 text-xs font-medium text-gray-700 dark:text-gray-300">
+                        <div className="flex flex-wrap gap-1">
+                          {getPicNames(item.pic).map((picName, pIdx) => (
+                            <span
+                              key={pIdx}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-[11px] font-medium"
+                            >
+                              👤 {picName}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span
@@ -899,10 +1031,17 @@ export default function KalenderKontenPage() {
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-400 block font-medium">Penanggung Jawab (PIC)</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">
-                    👤 {getPicName(selectedItem.pic)}
-                  </span>
+                  <span className="text-gray-400 block font-medium mb-1">Penanggung Jawab (PIC)</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {getPicNames(selectedItem.pic).map((picName, pIdx) => (
+                      <span
+                        key={pIdx}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold text-xs border border-gray-200 dark:border-gray-600"
+                      >
+                        👤 {picName}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -1119,20 +1258,45 @@ export default function KalenderKontenPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Penanggung Jawab (PIC) *
-                </label>
-                <select
-                  value={formData.pic}
-                  onChange={(e) => setFormData({ ...formData, pic: e.target.value })}
-                  className="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20"
-                >
-                  {mockUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nama} ({u.role})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Penanggung Jawab (PIC) * (Bisa pilih lebih dari 1 orang)
+                  </label>
+                  <span className="text-[11px] font-semibold text-brand-600 dark:text-brand-400">
+                    {formData.pic.length} PIC Terpilih
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 max-h-48 overflow-y-auto">
+                  {mockUsers.map((u) => {
+                    const isChecked = formData.pic.includes(u.id);
+                    return (
+                      <label
+                        key={u.id}
+                        className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition ${
+                          isChecked
+                            ? "bg-brand-50 border-brand-300 text-brand-900 dark:bg-brand-950/40 dark:border-brand-800 dark:text-brand-200 font-semibold shadow-2xs"
+                            : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handlePicCheckboxToggle(u.id)}
+                          className="rounded text-brand-500 focus:ring-brand-500/20"
+                        />
+                        <div className="truncate">
+                          <div className="truncate">{u.nama}</div>
+                          <div className="text-[10px] opacity-70 truncate font-normal">
+                            {u.role} • {u.email}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                  * Email notifikasi pengingat otomatis akan dikirim ke seluruh PIC yang terpilih pada hari-H jadwal konten.
+                </p>
               </div>
 
               {/* Note Informasi Pembuatan Folder Drive Bahan Otomatis */}

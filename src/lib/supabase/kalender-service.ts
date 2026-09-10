@@ -8,8 +8,7 @@ export interface KalenderKontenItem {
   status: string;
   drive_link_bahan?: string;
   deskripsi?: string;
-  caption?: string;
-  pic?: string;
+  pic?: string | string[];
 }
 
 export async function getKalenderKontenFromSupabase(): Promise<KalenderKontenItem[]> {

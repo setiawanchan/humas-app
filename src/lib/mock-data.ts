@@ -44,7 +44,7 @@ export interface ContentCalendarItem {
   drive_link_bahan: string;
   deskripsi: string;
   caption?: string; // Teks caption panjang untuk postingan sosmed
-  pic: string; // user id
+  pic: string | string[]; // user id atau array of user id
 }
 
 export const mockContentCalendar: ContentCalendarItem[] = [];
