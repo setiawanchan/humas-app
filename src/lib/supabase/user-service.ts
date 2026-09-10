@@ -71,25 +71,41 @@ export async function authenticateUserFromSupabase(
   identifier: string,
   pass: string
 ): Promise<User | null> {
-  // Cari berdasarkan email ATAU username
+  const cleanIdentifier = identifier.trim().toLowerCase();
+  const cleanPass = pass.trim();
+
+  // Cari pengguna di Supabase
   const { data, error } = await supabase
     .from("app_users")
     .select("*")
-    .or(`email.eq.${identifier},username.eq.${identifier}`)
+    .or(`email.ilike.${cleanIdentifier},username.ilike.${cleanIdentifier}`)
     .eq("is_active", true);
 
-  if (error || !data || data.length === 0) {
+  if (error) {
+    console.error("Error authenticating user from Supabase:", error);
     return null;
   }
 
-  const hashedInputPass = await hashPassword(pass);
-  const defaultAdminHash = await hashPassword("admin123");
+  if (!data || data.length === 0) {
+    console.warn("No active user found with identifier:", cleanIdentifier);
+    return null;
+  }
 
-  const user = data.find(
-    (u) =>
-      u.password === pass || // Jika di DB disimpan teks biasa (misal Portal@BPS24)
-      u.password === hashedInputPass // Jika di DB disimpan hash SHA-256
-  );
+  const hashedInputPass = await hashPassword(cleanPass);
+
+  const user = data.find((u) => {
+    if (!u.password) return false;
+    const dbPass = u.password.trim();
+    return (
+      dbPass === cleanPass ||
+      dbPass === hashedInputPass ||
+      dbPass.toLowerCase() === hashedInputPass.toLowerCase()
+    );
+  });
+
+  if (!user) {
+    console.warn("Password mismatch for user:", cleanIdentifier);
+  }
 
   return (user as User) || null;
 }
