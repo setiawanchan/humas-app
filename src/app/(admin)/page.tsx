@@ -44,9 +44,14 @@ const formatIndonesianDate = (dateStr: string) => {
   return dateStr;
 };
 
-const getPicName = (picId: string) => {
-  const user = mockUsers.find((u) => u.id === picId);
-  return user ? user.nama : picId;
+const getPicName = (pic: string | string[] | undefined) => {
+  if (!pic) return "-";
+  const ids = Array.isArray(pic) ? pic : [pic];
+  const names = ids.map((id) => {
+    const user = mockUsers.find((u) => u.id === id);
+    return user ? user.nama : id;
+  });
+  return names.join(", ");
 };
 
 const getPlatformLabel = (platform: ContentCalendarItem["platform"]) => {
