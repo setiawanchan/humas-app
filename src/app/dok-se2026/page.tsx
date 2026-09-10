@@ -518,20 +518,105 @@ export default function Dokse2026Page() {
     document.body.removeChild(link);
   };
 
-  // Handler Simple Import Data (JSON / CSV Format Text)
+  // Handler Unduh Template Excel / CSV
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "idsubsls",
+      "kode_kec",
+      "nama_kec",
+      "kode_desa",
+      "nama_desa",
+      "nama_sls",
+      "peta_desa",
+      "peta_subrt",
+      "dokumen_psls",
+      "peta_terisi",
+      "perubahan_batas",
+      "keterangan",
+    ];
+
+    const sampleRow = [
+      "360201000100100",
+      "010",
+      "Malingping",
+      "001",
+      "Malingping Utara",
+      "RT 001 / RW 001",
+      "Ada",
+      "Ada",
+      "Ada",
+      "Ya",
+      "Tidak",
+      "Contoh catatan kelengkapan",
+    ];
+
+    const csvContent =
+      "data:text/csv;charset=utf-8,\uFEFF" +
+      [headers.join(","), sampleRow.map((c) => `"${c}"`).join(",")].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `template-pengecekan-dokse2026.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Handler Simple Import Data (JSON / CSV / Paste Excel)
   const handleImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!importText.trim()) return;
+
     try {
-      const parsed = JSON.parse(importText);
-      if (Array.isArray(parsed)) {
-        setDataList(parsed);
-        await bulkInsertDokseDataToSupabase(parsed);
+      let itemsToInsert: DokseItem[] = [];
+
+      // Try parsing JSON first
+      if (importText.trim().startsWith("[")) {
+        itemsToInsert = JSON.parse(importText);
+      } else {
+        // Parse CSV or Tab-Separated Values (Copy Paste dari Excel)
+        const lines = importText.trim().split(/\r?\n/);
+        const headers = lines[0].split(/,|\t/).map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
+
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          const cols = lines[i].split(/,|\t/).map((c) => c.trim().replace(/^"|"$/g, ""));
+          const row: Record<string, string> = {};
+          headers.forEach((h, idx) => {
+            row[h] = cols[idx] || "";
+          });
+
+          if (row.idsubsls || row["id subsls"]) {
+            itemsToInsert.push({
+              idsubsls: row.idsubsls || row["id subsls"] || `sls_${Date.now()}_${i}`,
+              kode_kec: row.kode_kec || row["kode kec"] || row.kecamatan?.substring(0, 3) || "010",
+              nama_kec: row.nama_kec || row["nama kec"] || row.kecamatan || "Kecamatan",
+              kode_desa: row.kode_desa || row["kode desa"] || row.desa?.substring(0, 3) || "001",
+              nama_desa: row.nama_desa || row["nama desa"] || row.desa || "Desa",
+              nama_sls: row.nama_sls || row["nama sls"] || row["sls"] || "SLS",
+              peta_desa: (row.peta_desa || row["peta desa"] || "Ada") as "Ada" | "Tidak" | "-",
+              peta_subrt: (row.peta_subrt || row["peta subrt"] || "Ada") as "Ada" | "Tidak" | "-",
+              dokumen_psls: (row.dokumen_psls || row["dokumen psls"] || "Ada") as "Ada" | "Tidak" | "-",
+              peta_terisi: (row.peta_terisi || row["peta terisi"] || "Ya") as "Ya" | "Tidak" | "-",
+              perubahan_batas: (row.perubahan_batas || row["perubahan batas"] || "Tidak") as "Ada" | "Tidak" | "-",
+              keterangan: row.keterangan || "",
+            });
+          }
+        }
+      }
+
+      if (itemsToInsert.length > 0) {
+        setDataList(itemsToInsert);
+        await bulkInsertDokseDataToSupabase(itemsToInsert);
         setIsImportModalOpen(false);
         setImportText("");
-        alert("Berhasil mengunggah & menyinkronkan data ke Supabase!");
+        alert(`Berhasil mengunggah & menyinkronkan ${itemsToInsert.length} data ke Supabase!`);
+      } else {
+        alert("Format data tidak valid! Harap pastikan header kolom sesuai dengan template.");
       }
     } catch {
-      alert("Format data tidak valid! Harap masukkan data JSON array yang sesuai.");
+      alert("Gagal membaca data! Harap gunakan format CSV/Tab-Separated dari Excel atau JSON yang valid.");
     }
   };
 
@@ -1172,22 +1257,69 @@ export default function Dokse2026Page() {
       {isImportModalOpen && (
         <Modal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} showCloseButton={true} className="max-w-lg p-6">
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-              📥 Unggah Data Pengecekan Dokse 2026
-            </h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Tempelkan atau muat data dalam format JSON Array untuk memperbarui data pengecekan secara langsung.
-            </p>
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                  📥 Unggah Data Pengecekan Dokse 2026
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Impor data baru dari Excel / CSV secara langsung ke Supabase
+                </p>
+              </div>
+
+              {/* Tombol Unduh Template */}
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold hover:bg-purple-100 transition cursor-pointer flex items-center gap-1 shrink-0"
+              >
+                <span>📄</span> Unduh Template Excel
+              </button>
+            </div>
 
             <form onSubmit={handleImportSubmit} className="space-y-3">
-              <textarea
-                rows={6}
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                placeholder='[{"idsubsls":"360201000100100", "nama_kec":"Rangkasbitung", ...}]'
-                className="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-xs focus:ring-2 focus:ring-purple-500/20"
-              />
-              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+              {/* Opsi Upload File */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  1. Pilih File Excel / CSV (.csv / .txt / .json):
+                </label>
+                <input
+                  type="file"
+                  accept=".csv,.txt,.json"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (evt) => {
+                        const content = evt.target?.result as string;
+                        if (content) setImportText(content);
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                  className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-950 dark:file:text-purple-300 border border-gray-200 dark:border-gray-700 rounded-xl p-1 bg-gray-50 dark:bg-gray-900 cursor-pointer"
+                />
+              </div>
+
+              <div className="text-center text-[11px] font-bold text-gray-400 py-1">
+                ── ATAU ──
+              </div>
+
+              {/* Opsi Tempel Teks */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  2. Tempelkan (Paste) Tabel Excel / CSV / JSON:
+                </label>
+                <textarea
+                  rows={5}
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder="Tempelkan (Ctrl+V) baris tabel dari Ms. Excel atau data CSV di sini..."
+                  className="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-xs focus:ring-2 focus:ring-purple-500/20"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
                 <button
                   type="button"
                   onClick={() => setIsImportModalOpen(false)}
@@ -1197,9 +1329,9 @@ export default function Dokse2026Page() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow"
+                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow transition cursor-pointer"
                 >
-                  Impor Data
+                  Impor & Simpan ke Supabase
                 </button>
               </div>
             </form>
