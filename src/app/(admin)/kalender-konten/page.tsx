@@ -79,6 +79,14 @@ const formatToDDMMYYYY = (dateStr: string) => {
   return dateStr;
 };
 
+// Helper konversi tanggal hari ini WIB (UTC+7) ke format YYYY-MM-DD
+const getTodayWIB = (): string => {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const wib = new Date(utc + 7 * 3600000);
+  return wib.toISOString().split("T")[0];
+};
+
 // Helper Format ke ISO YYYY-MM-DD
 const formatToISO = (dateStr: string) => {
   if (!dateStr) return "";
@@ -148,6 +156,8 @@ const getStatusLabel = (status: ContentCalendarItem["status"]) => {
 import {
   getKalenderKontenFromSupabase,
   insertKalenderKontenToSupabase,
+  updateKalenderKontenInSupabase,
+  deleteKalenderKontenFromSupabase,
 } from "@/lib/supabase/kalender-service";
 
 const getPlatformLabel = (platform: ContentCalendarItem["platform"]) => {
@@ -193,9 +203,10 @@ export default function KalenderKontenPage() {
   // State Tampilan Mode: "calendar" | "list"
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
 
-  // State Tanggal yang sedang dilihat untuk Kalender Bulanan (Default Sept 2026 atau tanggal saat ini)
+  // State Tanggal yang sedang dilihat untuk Kalender Bulanan (Default Bulan & Tahun Berjalan WIB)
   const [currentDate, setCurrentDate] = useState(() => {
-    return new Date(2026, 8, 1); // 8 = September (0-indexed)
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
   });
 
   // State Search & Filter
@@ -209,6 +220,7 @@ export default function KalenderKontenPage() {
   // State Modal Form (Tambah / Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ContentCalendarItem | null>(null);
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   
   // State Copy Caption Feedback
   const [isCopied, setIsCopied] = useState(false);
@@ -218,7 +230,7 @@ export default function KalenderKontenPage() {
     judul: "",
     selectedPlatforms: ["instagram"] as ContentCalendarItem["platform"][], // Multi-select untuk Create mode
     platform: "instagram" as ContentCalendarItem["platform"], // Single platform untuk Edit mode
-    tanggal: new Date().toISOString().split("T")[0],
+    tanggal: getTodayWIB(),
     status: "draft" as ContentCalendarItem["status"],
     drive_link_bahan: "",
     deskripsi: "",
@@ -240,7 +252,7 @@ export default function KalenderKontenPage() {
     if (isFormOpen && dateInputRef.current) {
       const initialDate = formData.tanggal
         ? formatToDDMMYYYY(formData.tanggal)
-        : formatToDDMMYYYY(new Date().toISOString().split("T")[0]);
+        : formatToDDMMYYYY(getTodayWIB());
 
       const fp = flatpickr(dateInputRef.current, {
         dateFormat: "d-m-Y",
@@ -408,7 +420,7 @@ export default function KalenderKontenPage() {
       judul: "",
       selectedPlatforms: ["instagram"],
       platform: "instagram",
-      tanggal: initialDateStr || new Date().toISOString().split("T")[0],
+      tanggal: initialDateStr || getTodayWIB(),
       status: "draft",
       drive_link_bahan: "",
       deskripsi: "",
@@ -439,13 +451,20 @@ export default function KalenderKontenPage() {
   };
 
   // Quick Change Status dari Detail Modal
-  const handleQuickStatusChange = (newStatus: ContentCalendarItem["status"]) => {
+  const handleQuickStatusChange = async (newStatus: ContentCalendarItem["status"]) => {
     if (!selectedItem) return;
-    // TODO: Replace with Supabase update query
+    // 1. Optimistic update di state lokal
     setItems((prev) =>
       prev.map((i) => (i.id === selectedItem.id ? { ...i, status: newStatus } : i))
     );
     setSelectedItem((prev) => (prev ? { ...prev, status: newStatus } : null));
+
+    // 2. Simpan ke Supabase jika ada di database
+    try {
+      await updateKalenderKontenInSupabase(selectedItem.id, { status: newStatus });
+    } catch (err) {
+      console.warn("Gagal update status di Supabase:", err);
+    }
   };
 
   // Handler Trigger Manual Pengingat Hari Ini ke Gmail PIC
@@ -469,55 +488,108 @@ export default function KalenderKontenPage() {
   };
 
   // Submit Form Tambah / Edit
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmittingForm(true);
 
-    if (editingItem) {
-      // Mode Edit: Mengubah 1 baris item yang spesifik
-      // TODO: Replace with Supabase update query
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === editingItem.id
-            ? {
-                ...i,
-                judul: formData.judul,
-                platform: formData.platform,
-                tanggal: formData.tanggal,
-                status: formData.status,
-                drive_link_bahan: formData.drive_link_bahan,
-                deskripsi: formData.deskripsi,
-                caption: formData.caption,
-                pic: formData.pic,
-              }
-            : i
-        )
-      );
-    } else {
-      // Mode Create: Auto-generate URL Google Drive Folder Bahan untuk setiap platform yang dipilih
-      // TODO: Replace with Google Drive API call (googleDrive.createFolder(`Bahan - ${formData.judul}`))
-      const slug = formData.judul
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
-
-      const newItems: ContentCalendarItem[] = formData.selectedPlatforms.map(
-        (plat, index) => ({
-          id: `c_${Date.now()}_${index}`,
+    try {
+      if (editingItem) {
+        // Mode Edit: Mengubah baris item yang spesifik
+        const updatedFields = {
           judul: formData.judul,
-          platform: plat,
+          platform: formData.platform,
           tanggal: formData.tanggal,
           status: formData.status,
-          drive_link_bahan: `https://drive.google.com/drive/u/0/folders/bps-lebak-bahan-${slug || Date.now()}-${plat}`,
+          drive_link_bahan: formData.drive_link_bahan,
           deskripsi: formData.deskripsi,
           caption: formData.caption,
           pic: formData.pic,
-        })
-      );
+        };
 
-      setItems((prev) => [...newItems, ...prev]);
+        // Update di Supabase
+        await updateKalenderKontenInSupabase(editingItem.id, updatedFields);
+
+        // Update state lokal
+        setItems((prev) =>
+          prev.map((i) => (i.id === editingItem.id ? { ...i, ...updatedFields } : i))
+        );
+      } else {
+        // Mode Create:
+        // 1. Buat Folder Bahan di Google Drive via /api/upload-drive (module: "kalender")
+        let generatedDriveUrl = formData.drive_link_bahan;
+
+        if (!generatedDriveUrl) {
+          try {
+            const driveFormData = new FormData();
+            driveFormData.append("judul", formData.judul);
+            driveFormData.append("tanggal", formData.tanggal);
+            driveFormData.append("module", "kalender");
+
+            const driveRes = await fetch("/api/upload-drive", {
+              method: "POST",
+              body: driveFormData,
+            });
+
+            if (driveRes.ok) {
+              const driveData = await driveRes.json();
+              if (driveData.drive_url) {
+                generatedDriveUrl = driveData.drive_url;
+              }
+            }
+          } catch (driveErr) {
+            console.warn("Gagal membuat folder Google Drive otomatis:", driveErr);
+          }
+        }
+
+        // Fallback jika Google Drive API gagal / offline
+        if (!generatedDriveUrl) {
+          const slug = formData.judul
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "");
+          generatedDriveUrl = `https://drive.google.com/drive/u/0/folders/bps-lebak-bahan-${slug || Date.now()}`;
+        }
+
+        // 2. Buat item untuk setiap platform yang dipilih dan simpan ke Supabase
+        const newlyCreated: ContentCalendarItem[] = [];
+
+        for (let i = 0; i < formData.selectedPlatforms.length; i++) {
+          const plat = formData.selectedPlatforms[i];
+          const payload = {
+            judul: formData.judul,
+            platform: plat,
+            tanggal: formData.tanggal,
+            status: formData.status,
+            drive_link_bahan: generatedDriveUrl,
+            deskripsi: formData.deskripsi,
+            caption: formData.caption,
+            pic: formData.pic,
+          };
+
+          // Simpan ke Supabase
+          const inserted = await insertKalenderKontenToSupabase(payload as any);
+          if (inserted && inserted.id) {
+            newlyCreated.push(inserted as any);
+          } else {
+            // Fallback id lokal jika supabase gagal
+            newlyCreated.push({
+              id: `c_${Date.now()}_${i}`,
+              ...payload,
+            });
+          }
+        }
+
+        // Update state lokal dengan konten baru di bagian atas
+        setItems((prev) => [...newlyCreated, ...prev]);
+      }
+
+      setIsFormOpen(false);
+    } catch (err: any) {
+      console.error("Error submitting kalender form:", err);
+      alert("Terjadi kesalahan saat menyimpan konten: " + (err.message || String(err)));
+    } finally {
+      setIsSubmittingForm(false);
     }
-
-    setIsFormOpen(false);
   };
 
   // Trigger Hapus
@@ -528,9 +600,13 @@ export default function KalenderKontenPage() {
   };
 
   // Confirm Hapus
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingItem) return;
-    // TODO: Replace with Supabase delete query
+    try {
+      await deleteKalenderKontenFromSupabase(deletingItem.id);
+    } catch (err) {
+      console.warn("Gagal hapus dari Supabase:", err);
+    }
     setItems((prev) => prev.filter((i) => i.id !== deletingItem.id));
     setDeletingItem(null);
   };
@@ -621,23 +697,39 @@ export default function KalenderKontenPage() {
       {reminderResult && (
         <div
           className={`rounded-xl p-4 border text-xs transition relative flex items-start justify-between gap-3 ${
-            reminderResult.success
+            reminderResult.totalContentsFound === 0
+              ? "bg-sky-50 border-sky-200 text-sky-900 dark:bg-sky-950/40 dark:border-sky-900 dark:text-sky-200"
+              : reminderResult.success
               ? "bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-200"
               : "bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-200"
           }`}
         >
           <div className="space-y-1">
             <div className="font-bold flex items-center gap-1.5">
-              <span>{reminderResult.success ? "✅" : "⚠️"}</span>
-              <span>{reminderResult.success ? "Pengiriman Pengingat Selesai" : "Pengiriman Gagal"}</span>
+              <span>
+                {reminderResult.totalContentsFound === 0
+                  ? "ℹ️"
+                  : reminderResult.success
+                  ? "✅"
+                  : "⚠️"}
+              </span>
+              <span>
+                {reminderResult.totalContentsFound === 0
+                  ? "Informasi Jadwal Konten"
+                  : reminderResult.success
+                  ? "Pengiriman Pengingat Selesai"
+                  : "Pengiriman Gagal"}
+              </span>
             </div>
             <p className="opacity-90">
-              {reminderResult.message ||
-                `Berhasil mengirim ${reminderResult.emailsSent || 0} email dari ${
-                  reminderResult.totalPicsInvolved || 0
-                } PIC untuk ${reminderResult.totalContentsFound || 0} konten jadwal hari ini (${
-                  reminderResult.targetDate || "-"
-                }).`}
+              {reminderResult.totalContentsFound === 0
+                ? `Tidak ada jadwal konten aktif (draft/siap/terjadwal) yang jatuh tempo hari ini (${reminderResult.targetDate}). Tidak ada email yang perlu dikirim.`
+                : reminderResult.message ||
+                  `Berhasil mengirim ${reminderResult.emailsSent || 0} email dari ${
+                    reminderResult.totalPicsInvolved || 0
+                  } PIC untuk ${reminderResult.totalContentsFound || 0} konten jadwal hari ini (${
+                    reminderResult.targetDate || "-"
+                  }).`}
             </p>
             {reminderResult.details && reminderResult.details.length > 0 && (
               <div className="mt-2 space-y-1">
@@ -828,8 +920,7 @@ export default function KalenderKontenPage() {
               }
 
               const dateItems = cell.dateStr ? itemsByDate[cell.dateStr] || [] : [];
-              const isToday =
-                cell.dateStr === new Date().toISOString().split("T")[0];
+              const isToday = cell.dateStr === getTodayWIB();
 
               return (
                 <div
@@ -1373,9 +1464,20 @@ export default function KalenderKontenPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow transition cursor-pointer"
+                  disabled={isSubmittingForm}
+                  className="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow transition cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
                 >
-                  {editingItem ? "Simpan Perubahan" : "Tambah Konten"}
+                  {isSubmittingForm && (
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  {isSubmittingForm
+                    ? "Menyimpan & Membuat Folder..."
+                    : editingItem
+                    ? "Simpan Perubahan"
+                    : "Tambah Konten"}
                 </button>
               </div>
             </form>

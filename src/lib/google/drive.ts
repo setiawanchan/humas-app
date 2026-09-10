@@ -170,15 +170,17 @@ export const DEFAULT_GOOGLE_DRIVE_PARENT_FOLDER_ID = "13TsWALJI38xE55YxY1QOT9RsT
 export async function createActivityFolderHierarchy(
   dateStr: string,
   title: string,
-  moduleType: "dokumentasi" | "arsip" = "dokumentasi"
+  moduleType: "dokumentasi" | "arsip" | "kalender" = "dokumentasi"
 ): Promise<{ folderId: string; webViewLink: string }> {
   // Gunakan variabel environment jika ada, jika belum disetel di Vercel gunakan ID induk pasti
   const rootParentFolderId =
     process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID ||
     DEFAULT_GOOGLE_DRIVE_PARENT_FOLDER_ID;
 
-  // Tentukan nama folder modul utama: "Dokumentasi" atau "Arsip"
-  const moduleFolderName = moduleType === "arsip" ? "Arsip" : "Dokumentasi";
+  // Tentukan nama folder modul utama: "Dokumentasi", "Arsip", atau "Bahan Konten"
+  let moduleFolderName = "Dokumentasi";
+  if (moduleType === "arsip") moduleFolderName = "Arsip";
+  if (moduleType === "kalender") moduleFolderName = "Bahan Konten";
 
   // 1. Buat / Dapatkan folder modul di dalam Root Parent Folder
   const moduleRootFolder = await getOrCreateFolder(moduleFolderName, rootParentFolderId);

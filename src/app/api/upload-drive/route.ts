@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const judul = formData.get("judul") as string;
     const tanggal = (formData.get("tanggal_kegiatan") || formData.get("tanggal")) as string;
-    const moduleType = ((formData.get("module") as string) || "dokumentasi") as "dokumentasi" | "arsip";
+    const moduleType = ((formData.get("module") as string) || "dokumentasi") as "dokumentasi" | "arsip" | "kalender";
     const files = formData.getAll("files") as File[];
 
     if (!judul || !tanggal) {

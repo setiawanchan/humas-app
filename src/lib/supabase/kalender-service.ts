@@ -33,6 +33,35 @@ export async function insertKalenderKontenToSupabase(item: Partial<KalenderKonte
   return data?.[0];
 }
 
+export async function updateKalenderKontenInSupabase(
+  id: string,
+  updatedData: Partial<KalenderKontenItem>
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("kalender_konten")
+    .update(updatedData)
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error updating kalender_konten:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function deleteKalenderKontenFromSupabase(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("kalender_konten")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting kalender_konten:", error);
+    return false;
+  }
+  return true;
+}
+
 export interface DokumentasiItem {
   id?: string;
   judul: string;
