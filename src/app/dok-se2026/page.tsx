@@ -7,6 +7,7 @@ import { ApexOptions } from "apexcharts";
 import { mockDokseData, DokseItem } from "@/lib/dokse-data";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/context/AuthContext";
+import * as XLSX from "xlsx";
 import {
   getDokseDataFromSupabase,
   updateDokseItemInSupabase,
@@ -518,49 +519,32 @@ export default function Dokse2026Page() {
     document.body.removeChild(link);
   };
 
-  // Handler Unduh Template Excel / CSV
+
+
+  // Handler Unduh Template Excel (.xlsx)
   const handleDownloadTemplate = () => {
-    const headers = [
-      "idsubsls",
-      "kode_kec",
-      "nama_kec",
-      "kode_desa",
-      "nama_desa",
-      "nama_sls",
-      "peta_desa",
-      "peta_subrt",
-      "dokumen_psls",
-      "peta_terisi",
-      "perubahan_batas",
-      "keterangan",
+    const templateData = [
+      {
+        idsubsls: "360201000100100",
+        kode_kec: "010",
+        nama_kec: "Malingping",
+        kode_desa: "001",
+        nama_desa: "Malingping Utara",
+        nama_sls: "RT 001 / RW 001",
+        peta_desa: "Ada",
+        peta_subrt: "Ada",
+        dokumen_psls: "Ada",
+        peta_terisi: "Ya",
+        perubahan_batas: "Tidak",
+        keterangan: "Contoh catatan kelengkapan",
+      },
     ];
 
-    const sampleRow = [
-      "360201000100100",
-      "010",
-      "Malingping",
-      "001",
-      "Malingping Utara",
-      "RT 001 / RW 001",
-      "Ada",
-      "Ada",
-      "Ada",
-      "Ya",
-      "Tidak",
-      "Contoh catatan kelengkapan",
-    ];
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template Dokse 2026");
 
-    const csvContent =
-      "data:text/csv;charset=utf-8,\uFEFF" +
-      [headers.join(","), sampleRow.map((c) => `"${c}"`).join(",")].join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `template-pengecekan-dokse2026.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    XLSX.writeFile(workbook, "template-pengecekan-dokse2026.xlsx");
   };
 
   // Handler Simple Import Data (JSON / CSV / Paste Excel)
@@ -1263,7 +1247,7 @@ export default function Dokse2026Page() {
                   📥 Unggah Data Pengecekan Dokse 2026
                 </h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Impor data baru dari Excel / CSV secara langsung ke Supabase
+                  Impor data baru dari Excel (.xlsx) secara langsung
                 </p>
               </div>
 
@@ -1271,9 +1255,9 @@ export default function Dokse2026Page() {
               <button
                 type="button"
                 onClick={handleDownloadTemplate}
-                className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold hover:bg-purple-100 transition cursor-pointer flex items-center gap-1 shrink-0"
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow transition cursor-pointer flex items-center gap-1.5 shrink-0"
               >
-                <span>📄</span> Unduh Template Excel
+                <span>📊</span> Unduh Template Excel (.xlsx)
               </button>
             </div>
 
@@ -1281,23 +1265,37 @@ export default function Dokse2026Page() {
               {/* Opsi Upload File */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  1. Pilih File Excel / CSV (.csv / .txt / .json):
+                  1. Pilih File Excel (.xlsx / .xls / .csv):
                 </label>
                 <input
                   type="file"
-                  accept=".csv,.txt,.json"
+                  accept=".xlsx,.xls,.csv,.json,.txt"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (evt) => {
-                        const content = evt.target?.result as string;
-                        if (content) setImportText(content);
-                      };
-                      reader.readAsText(file);
+                      const fileName = file.name.toLowerCase();
+                      if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+                          const workbook = XLSX.read(data, { type: "array" });
+                          const firstSheetName = workbook.SheetNames[0];
+                          const worksheet = workbook.Sheets[firstSheetName];
+                          const json = XLSX.utils.sheet_to_json(worksheet);
+                          setImportText(JSON.stringify(json));
+                        };
+                        reader.readAsArrayBuffer(file);
+                      } else {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          const content = evt.target?.result as string;
+                          if (content) setImportText(content);
+                        };
+                        reader.readAsText(file);
+                      }
                     }
                   }}
-                  className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-950 dark:file:text-purple-300 border border-gray-200 dark:border-gray-700 rounded-xl p-1 bg-gray-50 dark:bg-gray-900 cursor-pointer"
+                  className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 dark:file:bg-emerald-950 dark:file:text-emerald-300 border border-gray-200 dark:border-gray-700 rounded-xl p-1 bg-gray-50 dark:bg-gray-900 cursor-pointer"
                 />
               </div>
 
@@ -1308,13 +1306,13 @@ export default function Dokse2026Page() {
               {/* Opsi Tempel Teks */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  2. Tempelkan (Paste) Tabel Excel / CSV / JSON:
+                  2. Tempelkan (Paste) Baris Tabel dari Ms. Excel:
                 </label>
                 <textarea
                   rows={5}
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
-                  placeholder="Tempelkan (Ctrl+V) baris tabel dari Ms. Excel atau data CSV di sini..."
+                  placeholder="Tempelkan (Ctrl+V) baris tabel dari Ms. Excel di sini..."
                   className="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-xs focus:ring-2 focus:ring-purple-500/20"
                 />
               </div>
@@ -1329,9 +1327,9 @@ export default function Dokse2026Page() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow transition cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow transition cursor-pointer"
                 >
-                  Impor & Simpan ke Supabase
+                  Impor & Simpan Data
                 </button>
               </div>
             </form>
