@@ -387,12 +387,25 @@ export default function Dokse2026Page() {
       // 5. Text Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchNama = item.nama_sls.toLowerCase().includes(q);
-        const matchDesa = item.nama_desa.toLowerCase().includes(q);
-        const matchKec = item.nama_kec.toLowerCase().includes(q);
-        const matchId = item.idsubsls.toLowerCase().includes(q);
-        const matchKet = item.keterangan.toLowerCase().includes(q);
-        if (!matchNama && !matchDesa && !matchKec && !matchId && !matchKet) return false;
+        const matchNama = (item.nama_sls || "").toLowerCase().includes(q);
+        const matchDesa = (item.nama_desa || "").toLowerCase().includes(q);
+        const matchKec = (item.nama_kec || "").toLowerCase().includes(q);
+        const matchId = (item.idsubsls || "").toLowerCase().includes(q);
+        const matchKet = (item.keterangan || "").toLowerCase().includes(q);
+        const matchJenis = (item.jenis || "").toLowerCase().includes(q);
+        const matchKodeSls = (item.kode_sls || "").toLowerCase().includes(q);
+        const matchKodeSubsls = (item.kode_subsls || "").toLowerCase().includes(q);
+        if (
+          !matchNama &&
+          !matchDesa &&
+          !matchKec &&
+          !matchId &&
+          !matchKet &&
+          !matchJenis &&
+          !matchKodeSls &&
+          !matchKodeSubsls
+        )
+          return false;
       }
 
       return true;
@@ -480,9 +493,14 @@ export default function Dokse2026Page() {
   const handleExportExcel = () => {
     const headers = [
       "ID SubSLS",
-      "Kecamatan",
-      "Desa/Kelurahan",
-      "Nama SLS / SubSLS",
+      "Nama SLS",
+      "Jenis",
+      "Kode Kecamatan",
+      "Nama Kecamatan",
+      "Kode Desa",
+      "Nama Desa",
+      "Kode SLS",
+      "Kode SubSLS",
       "Peta Desa",
       "Peta Sub-RT",
       "Dokumen PSLS",
@@ -493,17 +511,22 @@ export default function Dokse2026Page() {
     ];
 
     const rows = filteredData.map((item) => [
-      `"${item.idsubsls}"`,
-      `"${item.nama_kec}"`,
-      `"${item.nama_desa}"`,
-      `"${item.nama_sls}"`,
-      `"${item.peta_desa}"`,
-      `"${item.peta_subrt}"`,
-      `"${item.dokumen_psls}"`,
-      `"${item.peta_terisi}"`,
-      `"${item.perubahan_batas}"`,
+      `"${item.idsubsls || ""}"`,
+      `"${item.nama_sls || ""}"`,
+      `"${item.jenis || ""}"`,
+      `"${item.kode_kec || ""}"`,
+      `"${item.nama_kec || ""}"`,
+      `"${item.kode_desa || ""}"`,
+      `"${item.nama_desa || ""}"`,
+      `"${item.kode_sls || ""}"`,
+      `"${item.kode_subsls || ""}"`,
+      `"${item.peta_desa || ""}"`,
+      `"${item.peta_subrt || ""}"`,
+      `"${item.dokumen_psls || ""}"`,
+      `"${item.peta_terisi || ""}"`,
+      `"${item.perubahan_batas || ""}"`,
       `"${getStatusPenerimaan(item)}"`,
-      `"${item.keterangan.replace(/"/g, '""')}"`,
+      `"${(item.keterangan || "").replace(/"/g, '""')}"`,
     ]);
 
     const csvContent =
@@ -525,18 +548,21 @@ export default function Dokse2026Page() {
   const handleDownloadTemplate = () => {
     const templateData = [
       {
-        idsubsls: "360201000100100",
-        kode_kec: "010",
-        nama_kec: "Malingping",
-        kode_desa: "001",
-        nama_desa: "Malingping Utara",
-        nama_sls: "RT 001 / RW 001",
-        peta_desa: "Ada",
-        peta_subrt: "Ada",
-        dokumen_psls: "Ada",
-        peta_terisi: "Ya",
-        perubahan_batas: "Tidak",
-        keterangan: "Contoh catatan kelengkapan",
+        "ID SubSLS": "360201000100100",
+        "Nama SLS": "RT 001 / RW 001",
+        "Jenis": "SLS",
+        "Kode Kecamatan": "010",
+        "Nama Kecamatan": "Malingping",
+        "Kode Desa": "001",
+        "Nama Desa": "Malingping Utara",
+        "Kode SLS": "001",
+        "Kode SubSLS": "00",
+        "Peta Desa": "Ada",
+        "Peta Sub-RT": "Ada",
+        "Dokumen PSLS": "Ada",
+        "Peta Terisi": "Ya",
+        "Perubahan Batas": "Tidak",
+        "Keterangan": "Contoh catatan kelengkapan",
       },
     ];
 
@@ -557,7 +583,24 @@ export default function Dokse2026Page() {
 
       // Try parsing JSON first
       if (importText.trim().startsWith("[")) {
-        itemsToInsert = JSON.parse(importText);
+        const rawJson = JSON.parse(importText);
+        itemsToInsert = rawJson.map((row: any, i: number) => ({
+          idsubsls: String(row.idsubsls || row["id subsls"] || row["ID SubSLS"] || `sls_${Date.now()}_${i}`),
+          nama_sls: String(row.nama_sls || row["nama sls"] || row["Nama SLS"] || row.sls || "SLS"),
+          jenis: String(row.jenis || row["Jenis"] || ""),
+          kode_kec: String(row.kode_kec || row["kode kec"] || row["Kode Kecamatan"] || row["kode kecamatan"] || row.kecamatan?.substring(0, 3) || "010"),
+          nama_kec: String(row.nama_kec || row["nama kec"] || row["Nama Kecamatan"] || row["nama kecamatan"] || row.kecamatan || "Kecamatan"),
+          kode_desa: String(row.kode_desa || row["kode desa"] || row["Kode Desa"] || row["kode desa"] || row.desa?.substring(0, 3) || "001"),
+          nama_desa: String(row.nama_desa || row["nama desa"] || row["Nama Desa"] || row["nama desa"] || row.desa || "Desa"),
+          kode_sls: String(row.kode_sls || row["kode sls"] || row["Kode SLS"] || ""),
+          kode_subsls: String(row.kode_subsls || row["kode subsls"] || row["Kode SubSLS"] || ""),
+          peta_desa: (row.peta_desa || row["peta desa"] || row["Peta Desa"] || "Ada") as "Ada" | "Tidak" | "-",
+          peta_subrt: (row.peta_subrt || row["peta subrt"] || row["Peta Sub-RT"] || row["Peta SubRT"] || "Ada") as "Ada" | "Tidak" | "-",
+          dokumen_psls: (row.dokumen_psls || row["dokumen psls"] || row["Dokumen PSLS"] || "Ada") as "Ada" | "Tidak" | "-",
+          peta_terisi: (row.peta_terisi || row["peta terisi"] || row["Peta Terisi"] || "Ya") as "Ya" | "Tidak" | "-",
+          perubahan_batas: (row.perubahan_batas || row["perubahan batas"] || row["Perubahan Batas"] || "Tidak") as "Ada" | "Tidak" | "-",
+          keterangan: String(row.keterangan || row["keterangan"] || row["Keterangan"] || ""),
+        }));
       } else {
         // Parse CSV or Tab-Separated Values (Copy Paste dari Excel)
         const lines = importText.trim().split(/\r?\n/);
@@ -571,19 +614,22 @@ export default function Dokse2026Page() {
             row[h] = cols[idx] || "";
           });
 
-          if (row.idsubsls || row["id subsls"]) {
+          if (row.idsubsls || row["id subsls"] || row["id_subsls"]) {
             itemsToInsert.push({
-              idsubsls: row.idsubsls || row["id subsls"] || `sls_${Date.now()}_${i}`,
-              kode_kec: row.kode_kec || row["kode kec"] || row.kecamatan?.substring(0, 3) || "010",
-              nama_kec: row.nama_kec || row["nama kec"] || row.kecamatan || "Kecamatan",
-              kode_desa: row.kode_desa || row["kode desa"] || row.desa?.substring(0, 3) || "001",
-              nama_desa: row.nama_desa || row["nama desa"] || row.desa || "Desa",
-              nama_sls: row.nama_sls || row["nama sls"] || row["sls"] || "SLS",
-              peta_desa: (row.peta_desa || row["peta desa"] || "Ada") as "Ada" | "Tidak" | "-",
-              peta_subrt: (row.peta_subrt || row["peta subrt"] || "Ada") as "Ada" | "Tidak" | "-",
-              dokumen_psls: (row.dokumen_psls || row["dokumen psls"] || "Ada") as "Ada" | "Tidak" | "-",
-              peta_terisi: (row.peta_terisi || row["peta terisi"] || "Ya") as "Ya" | "Tidak" | "-",
-              perubahan_batas: (row.perubahan_batas || row["perubahan batas"] || "Tidak") as "Ada" | "Tidak" | "-",
+              idsubsls: row.idsubsls || row["id subsls"] || row["id_subsls"] || `sls_${Date.now()}_${i}`,
+              nama_sls: row.nama_sls || row["nama sls"] || row["nama_sls"] || row["sls"] || "SLS",
+              jenis: row.jenis || "",
+              kode_kec: row.kode_kec || row["kode kec"] || row["kode_kec"] || row["kode kecamatan"] || row.kecamatan?.substring(0, 3) || "010",
+              nama_kec: row.nama_kec || row["nama kec"] || row["nama_kec"] || row["nama kecamatan"] || row.kecamatan || "Kecamatan",
+              kode_desa: row.kode_desa || row["kode desa"] || row["kode_desa"] || row["kode desa/kelurahan"] || row.desa?.substring(0, 3) || "001",
+              nama_desa: row.nama_desa || row["nama desa"] || row["nama_desa"] || row["nama desa/kelurahan"] || row.desa || "Desa",
+              kode_sls: row.kode_sls || row["kode sls"] || row["kode_sls"] || "",
+              kode_subsls: row.kode_subsls || row["kode subsls"] || row["kode_subsls"] || "",
+              peta_desa: (row.peta_desa || row["peta desa"] || row["peta_desa"] || "Ada") as "Ada" | "Tidak" | "-",
+              peta_subrt: (row.peta_subrt || row["peta subrt"] || row["peta_subrt"] || row["peta sub-rt"] || "Ada") as "Ada" | "Tidak" | "-",
+              dokumen_psls: (row.dokumen_psls || row["dokumen psls"] || row["dokumen_psls"] || "Ada") as "Ada" | "Tidak" | "-",
+              peta_terisi: (row.peta_terisi || row["peta terisi"] || row["peta_terisi"] || "Ya") as "Ya" | "Tidak" | "-",
+              perubahan_batas: (row.perubahan_batas || row["perubahan batas"] || row["perubahan_batas"] || "Tidak") as "Ada" | "Tidak" | "-",
               keterangan: row.keterangan || "",
             });
           }
@@ -846,14 +892,19 @@ export default function Dokse2026Page() {
         {/* Full Data Table */}
         <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1200px]">
+            <table className="w-full text-left border-collapse min-w-[1400px]">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-700/50 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider select-none">
                   <th className="py-3 px-3 w-10 text-center">No</th>
                   <th className="py-3 px-3 w-36">ID SubSLS</th>
+                  <th className="py-3 px-3 min-w-[180px]">Nama SLS</th>
+                  <th className="py-3 px-3 w-20">Jenis</th>
+                  <th className="py-3 px-3 w-24">Kd Kec</th>
                   <th className="py-3 px-3 w-32">Kecamatan</th>
+                  <th className="py-3 px-3 w-24">Kd Desa</th>
                   <th className="py-3 px-3 w-36">Desa / Kelurahan</th>
-                  <th className="py-3 px-3 min-w-[200px]">Nama SLS / SubSLS</th>
+                  <th className="py-3 px-3 w-20">Kd SLS</th>
+                  <th className="py-3 px-3 w-24">Kd SubSLS</th>
                   <th className="py-3 px-3 w-28 text-center bg-orange-50/50 dark:bg-orange-950/20 text-orange-800 dark:text-orange-300">Peta Desa</th>
                   <th className="py-3 px-3 w-28 text-center">Peta Sub-RT</th>
                   <th className="py-3 px-3 w-28 text-center">Dokumen PSLS</th>
@@ -866,7 +917,7 @@ export default function Dokse2026Page() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 text-xs">
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="p-8 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={17} className="p-8 text-center text-gray-500 dark:text-gray-400">
                       Tidak ada data pengecekan Dokse 2026 yang sesuai dengan filter.
                     </td>
                   </tr>
@@ -889,9 +940,31 @@ export default function Dokse2026Page() {
                           {item.idsubsls}
                         </td>
 
+                        {/* Nama SLS */}
+                        <td className="py-3 px-3 font-semibold text-gray-900 dark:text-white">
+                          {item.nama_sls}
+                        </td>
+
+                        {/* Jenis */}
+                        <td className="py-3 px-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium text-[11px]">
+                            {item.jenis || "-"}
+                          </span>
+                        </td>
+
+                        {/* Kode Kecamatan */}
+                        <td className="py-3 px-3 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                          {item.kode_kec}
+                        </td>
+
                         {/* Kecamatan */}
                         <td className="py-3 px-3 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {item.nama_kec}
+                        </td>
+
+                        {/* Kode Desa */}
+                        <td className="py-3 px-3 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                          {item.kode_desa}
                         </td>
 
                         {/* Desa */}
@@ -899,9 +972,14 @@ export default function Dokse2026Page() {
                           {item.nama_desa}
                         </td>
 
-                        {/* Nama SLS */}
-                        <td className="py-3 px-3 font-semibold text-gray-900 dark:text-white">
-                          {item.nama_sls}
+                        {/* Kode SLS */}
+                        <td className="py-3 px-3 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                          {item.kode_sls || "-"}
+                        </td>
+
+                        {/* Kode SubSLS */}
+                        <td className="py-3 px-3 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                          {item.kode_subsls || "-"}
                         </td>
 
                         {/* Peta Desa (Sinkron per Desa) */}
