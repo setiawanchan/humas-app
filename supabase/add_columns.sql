@@ -1,5 +1,0 @@
--- Tambahkan kolom baru ke tabel dokse_2026
-ALTER TABLE dokse_2026
-ADD COLUMN IF NOT EXISTS jenis TEXT DEFAULT '',
-ADD COLUMN IF NOT EXISTS kode_sls TEXT DEFAULT '',
-ADD COLUMN IF NOT EXISTS kode_subsls TEXT DEFAULT '';
