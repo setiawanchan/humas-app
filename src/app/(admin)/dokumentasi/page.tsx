@@ -135,12 +135,21 @@ export default function DokumentasiPage() {
   // State Modal Form (Tambah / Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Documentation | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    judul: string;
+    deskripsi: string;
+    tanggal_kegiatan: string;
+    uploadedFilesName: string;
+    selectedFiles: File[];
+  }>({
     judul: "",
     deskripsi: "",
     tanggal_kegiatan: new Date().toISOString().split("T")[0],
     uploadedFilesName: "",
+    selectedFiles: [],
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadStatusText, setUploadStatusText] = useState("");
 
   // State Modal Konfirmasi Hapus
   const [deletingItem, setDeletingItem] = useState<Documentation | null>(null);
@@ -300,7 +309,9 @@ export default function DokumentasiPage() {
       deskripsi: "",
       tanggal_kegiatan: new Date().toISOString().split("T")[0],
       uploadedFilesName: "",
+      selectedFiles: [],
     });
+    setUploadStatusText("");
     setIsFormOpen(true);
   };
 
@@ -313,76 +324,116 @@ export default function DokumentasiPage() {
       deskripsi: item.deskripsi,
       tanggal_kegiatan: item.tanggal_kegiatan,
       uploadedFilesName: "",
+      selectedFiles: [],
     });
+    setUploadStatusText("");
     setIsFormOpen(true);
   };
 
   // Submit Form (Tambah / Edit)
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
-    if (editingItem) {
-      // Edit mode: update Supabase
-      const payload: Partial<DokumentasiItem> = {
-        judul: formData.judul,
-        deskripsi: formData.deskripsi,
-        tanggal_kegiatan: formData.tanggal_kegiatan,
-      };
+    try {
+      if (editingItem) {
+        // Edit mode: update Supabase
+        const payload: Partial<DokumentasiItem> = {
+          judul: formData.judul,
+          deskripsi: formData.deskripsi,
+          tanggal_kegiatan: formData.tanggal_kegiatan,
+        };
 
-      // Optimistic update
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === editingItem.id
-            ? {
-                ...item,
-                ...payload,
-              }
-            : item
-        )
-      );
-
-      setIsFormOpen(false);
-      await updateDokumentasiInSupabase(editingItem.id, payload);
-    } else {
-      // Create mode
-      const slug = formData.judul
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
-      const generatedDriveUrl = `https://drive.google.com/drive/u/0/folders/bps-lebak-${slug || Date.now()}`;
-
-      const payload: Omit<DokumentasiItem, "id"> = {
-        judul: formData.judul,
-        deskripsi: formData.deskripsi,
-        tanggal_kegiatan: formData.tanggal_kegiatan,
-        drive_url: generatedDriveUrl,
-        uploaded_by: currentUser?.nama || currentUser?.id || "Admin",
-      };
-
-      const tempItem: Documentation = {
-        id: `temp_${Date.now()}`,
-        judul: payload.judul,
-        deskripsi: payload.deskripsi,
-        kategori: "foto",
-        tanggal_kegiatan: payload.tanggal_kegiatan,
-        tags: [],
-        drive_url: generatedDriveUrl,
-        uploaded_by: payload.uploaded_by || "",
-      };
-
-      setItems((prev) => [tempItem, ...prev]);
-      setIsFormOpen(false);
-
-      const inserted = await insertDokumentasiToSupabase(payload);
-      if (inserted && inserted.id) {
+        // Optimistic update
         setItems((prev) =>
           prev.map((item) =>
-            item.id === tempItem.id ? (inserted as unknown as Documentation) : item
+            item.id === editingItem.id
+              ? {
+                  ...item,
+                  ...payload,
+                }
+              : item
           )
         );
+
+        setIsFormOpen(false);
+        await updateDokumentasiInSupabase(editingItem.id, payload);
+      } else {
+        // Create mode: Upload ke Google Drive via /api/upload-drive (Tahun -> Bulan -> Kegiatan)
+        setUploadStatusText("Membuat folder di Google Drive & mengunggah berkas...");
+
+        let driveUrl = "";
+        try {
+          const driveBody = new FormData();
+          driveBody.append("judul", formData.judul);
+          driveBody.append("tanggal_kegiatan", formData.tanggal_kegiatan);
+          if (formData.selectedFiles && formData.selectedFiles.length > 0) {
+            formData.selectedFiles.forEach((file) => {
+              driveBody.append("files", file);
+            });
+          }
+
+          const uploadRes = await fetch("/api/upload-drive", {
+            method: "POST",
+            body: driveBody,
+          });
+
+          const uploadData = await uploadRes.json();
+          if (uploadData && uploadData.drive_url) {
+            driveUrl = uploadData.drive_url;
+          }
+        } catch (uploadErr) {
+          console.warn("Upload ke Google Drive API fallback:", uploadErr);
+        }
+
+        // Fallback jika API belum mendapat url
+        if (!driveUrl) {
+          const slug = formData.judul
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "");
+          driveUrl = `https://drive.google.com/drive/u/0/folders/bps-lebak-${slug || Date.now()}`;
+        }
+
+        const payload: Omit<DokumentasiItem, "id"> = {
+          judul: formData.judul,
+          deskripsi: formData.deskripsi,
+          tanggal_kegiatan: formData.tanggal_kegiatan,
+          drive_url: driveUrl,
+          uploaded_by: currentUser?.nama || currentUser?.id || "Admin",
+        };
+
+        const tempItem: Documentation = {
+          id: `temp_${Date.now()}`,
+          judul: payload.judul,
+          deskripsi: payload.deskripsi,
+          kategori: "foto",
+          tanggal_kegiatan: payload.tanggal_kegiatan,
+          tags: [],
+          drive_url: driveUrl,
+          uploaded_by: payload.uploaded_by || "",
+        };
+
+        setItems((prev) => [tempItem, ...prev]);
+        setIsFormOpen(false);
+
+        const inserted = await insertDokumentasiToSupabase(payload);
+        if (inserted && inserted.id) {
+          setItems((prev) =>
+            prev.map((item) =>
+              item.id === tempItem.id ? (inserted as unknown as Documentation) : item
+            )
+          );
+        }
       }
+    } catch (err) {
+      console.error("Error submitting dokumentasi:", err);
+    } finally {
+      setIsSubmitting(false);
+      setUploadStatusText("");
     }
   };
+
 
   // Trigger Hapus
   const handleOpenDeleteConfirm = (item: Documentation, e?: React.MouseEvent) => {
@@ -430,15 +481,28 @@ export default function DokumentasiPage() {
         </div>
 
         {canManage && (
-          <button
-            onClick={handleOpenCreateForm}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-5 py-3 font-semibold text-sm shadow-md hover:shadow-lg transition duration-200 cursor-pointer"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Tambah Dokumentasi
-          </button>
+          <div className="flex items-center gap-2.5">
+            <a
+              href="/api/auth/google"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Hubungkan akun Google Drive admin untuk mengaktifkan upload otomatis"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-3.5 py-3 font-semibold text-xs shadow-sm transition duration-200 cursor-pointer"
+            >
+              <span className="text-base">🔑</span>
+              <span>Hubungkan Drive</span>
+            </a>
+
+            <button
+              onClick={handleOpenCreateForm}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-5 py-3 font-semibold text-sm shadow-md hover:shadow-lg transition duration-200 cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Tambah Dokumentasi
+            </button>
+          </div>
         )}
       </div>
 
@@ -800,6 +864,7 @@ export default function DokumentasiPage() {
                         const fileNames = files.map((f) => f.name).join(", ");
                         setFormData((prev) => ({
                           ...prev,
+                          selectedFiles: files,
                           uploadedFilesName: `${files.length} file dipilih (${fileNames.slice(0, 40)}${fileNames.length > 40 ? "..." : ""})`,
                         }));
                       }
@@ -814,7 +879,7 @@ export default function DokumentasiPage() {
                       Klik atau seret foto/berkas ke sini untuk upload
                     </p>
                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                      File akan disimpan dan link Google Drive akan otomatis tersinkronisasi.
+                      File akan disimpan ke Google Drive (Tahun ➔ Bulan ➔ Kegiatan) secara otomatis.
                     </p>
                     {formData.uploadedFilesName && (
                       <span className="mt-1 px-2.5 py-1 rounded-md bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300 text-xs font-medium">
@@ -825,19 +890,37 @@ export default function DokumentasiPage() {
                 </div>
               </div>
 
+              {isSubmitting && (
+                <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 text-xs text-orange-800 dark:text-orange-300 flex items-center gap-2">
+                  <span className="animate-spin text-base">⏳</span>
+                  <span>{uploadStatusText || "Sedang memproses..."}</span>
+                </div>
+              )}
+
               <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 dark:border-gray-700">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setIsFormOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-semibold transition cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow transition cursor-pointer"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow transition cursor-pointer disabled:opacity-50 flex items-center gap-2"
                 >
-                  {editingItem ? "Simpan Perubahan" : "Upload & Generate Link Drive"}
+                  {isSubmitting ? (
+                    <>
+                      <span className="animate-spin">🔄</span>
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : editingItem ? (
+                    "Simpan Perubahan"
+                  ) : (
+                    "Upload ke Drive & Simpan"
+                  )}
                 </button>
               </div>
             </form>
