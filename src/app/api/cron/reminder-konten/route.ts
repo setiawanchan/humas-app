@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getKalenderKontenFromSupabase } from "@/lib/supabase/kalender-service";
-import { mockContentCalendar, mockUsers, ContentCalendarItem } from "@/lib/mock-data";
+import { getUsersFromSupabase } from "@/lib/supabase/user-service";
+import { mockContentCalendar, mockUsers, ContentCalendarItem, User } from "@/lib/mock-data";
 import { sendGmail } from "@/lib/mail/mailer";
 import { generateReminderEmailHtml, ReminderContentData } from "@/lib/mail/template";
 
@@ -105,7 +106,21 @@ async function handleReminder(request: Request) {
       }
     }
 
-    // 4. Kirim email untuk setiap PIC
+    // 4. Ambil data users asli dari Supabase untuk alamat email penerima
+    let userList: User[] = [];
+    try {
+      const dbUsers = await getUsersFromSupabase();
+      if (dbUsers && dbUsers.length > 0) {
+        userList = dbUsers;
+      }
+    } catch (e) {
+      console.warn("Gagal load users dari Supabase:", e);
+    }
+    if (userList.length === 0) {
+      userList = mockUsers;
+    }
+
+    // 5. Kirim email untuk setiap PIC
     const sendResults: {
       userId: string;
       email: string;
@@ -116,7 +131,7 @@ async function handleReminder(request: Request) {
     }[] = [];
 
     for (const [userId, userContents] of picContentsMap.entries()) {
-      const user = mockUsers.find((u) => u.id === userId);
+      const user = userList.find((u) => u.id === userId);
       if (!user || !user.email) {
         sendResults.push({
           userId,

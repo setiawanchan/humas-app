@@ -7,9 +7,11 @@ import { useAuth } from "@/context/AuthContext";
 import {
   mockContentCalendar,
   ContentCalendarItem,
+  User,
   mockUsers,
 } from "@/lib/mock-data";
 import { Modal } from "@/components/ui/modal";
+import { getUsersFromSupabase } from "@/lib/supabase/user-service";
 
 // List Pilihan Platform Media Sosial
 const PLATFORM_OPTIONS: { id: ContentCalendarItem["platform"]; label: string; icon: string }[] = [
@@ -88,17 +90,24 @@ const formatToISO = (dateStr: string) => {
 };
 
 // Helper Nama PIC (Support single string atau array of IDs)
-const getPicNames = (pic: string | string[] | undefined): string[] => {
+const getPicNames = (
+  pic: string | string[] | undefined,
+  userList?: User[]
+): string[] => {
   if (!pic) return ["-"];
   const ids = Array.isArray(pic) ? pic : [pic];
+  const source = userList && userList.length > 0 ? userList : mockUsers;
   return ids.map((id) => {
-    const user = mockUsers.find((u) => u.id === id);
+    const user = source.find((u) => u.id === id);
     return user ? user.nama : id;
   });
 };
 
-const getPicName = (pic: string | string[] | undefined): string => {
-  const names = getPicNames(pic);
+const getPicName = (
+  pic: string | string[] | undefined,
+  userList?: User[]
+): string => {
+  const names = getPicNames(pic, userList);
   return names.join(", ");
 };
 
@@ -153,13 +162,23 @@ export default function KalenderKontenPage() {
   const canManage =
     currentUser?.role === "administrator" || currentUser?.role === "admin_humas";
 
+  // State Data Pengguna Asli dari Supabase untuk PIC
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+
   // State Utama Data Items
   const [items, setItems] = useState<ContentCalendarItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchKalender() {
+    async function loadData() {
       setIsLoading(true);
+      // 1. Fetch data pengguna dari Supabase
+      const usersData = await getUsersFromSupabase();
+      if (usersData) {
+        setAvailableUsers(usersData.filter((u) => u.is_active));
+      }
+
+      // 2. Fetch data kalender konten dari Supabase
       const remote = await getKalenderKontenFromSupabase();
       if (remote && remote.length > 0) {
         setItems(remote as any);
@@ -168,7 +187,7 @@ export default function KalenderKontenPage() {
       }
       setIsLoading(false);
     }
-    fetchKalender();
+    loadData();
   }, []);
 
   // State Tampilan Mode: "calendar" | "list"
@@ -313,7 +332,7 @@ export default function KalenderKontenPage() {
         const matches =
           item.judul.toLowerCase().includes(q) ||
           item.deskripsi.toLowerCase().includes(q) ||
-          getPicName(item.pic).toLowerCase().includes(q);
+          getPicName(item.pic, availableUsers).toLowerCase().includes(q);
         if (!matches) return false;
       }
 
@@ -937,7 +956,7 @@ export default function KalenderKontenPage() {
                       </td>
                       <td className="py-3.5 px-4 text-xs font-medium text-gray-700 dark:text-gray-300">
                         <div className="flex flex-wrap gap-1">
-                          {getPicNames(item.pic).map((picName, pIdx) => (
+                          {getPicNames(item.pic, availableUsers).map((picName, pIdx) => (
                             <span
                               key={pIdx}
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-[11px] font-medium"
@@ -1033,7 +1052,7 @@ export default function KalenderKontenPage() {
                 <div>
                   <span className="text-gray-400 block font-medium mb-1">Penanggung Jawab (PIC)</span>
                   <div className="flex flex-wrap gap-1.5">
-                    {getPicNames(selectedItem.pic).map((picName, pIdx) => (
+                    {getPicNames(selectedItem.pic, availableUsers).map((picName, pIdx) => (
                       <span
                         key={pIdx}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold text-xs border border-gray-200 dark:border-gray-600"
@@ -1267,32 +1286,38 @@ export default function KalenderKontenPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 max-h-48 overflow-y-auto">
-                  {mockUsers.map((u) => {
-                    const isChecked = formData.pic.includes(u.id);
-                    return (
-                      <label
-                        key={u.id}
-                        className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition ${
-                          isChecked
-                            ? "bg-brand-50 border-brand-300 text-brand-900 dark:bg-brand-950/40 dark:border-brand-800 dark:text-brand-200 font-semibold shadow-2xs"
-                            : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handlePicCheckboxToggle(u.id)}
-                          className="rounded text-brand-500 focus:ring-brand-500/20"
-                        />
-                        <div className="truncate">
-                          <div className="truncate">{u.nama}</div>
-                          <div className="text-[10px] opacity-70 truncate font-normal">
-                            {u.role} • {u.email}
+                  {availableUsers.length === 0 ? (
+                    <div className="col-span-2 text-center py-4 text-xs text-gray-500 dark:text-gray-400">
+                      {isLoading ? "Memuat data pengguna..." : "Belum ada data pengguna aktif di database."}
+                    </div>
+                  ) : (
+                    availableUsers.map((u) => {
+                      const isChecked = formData.pic.includes(u.id);
+                      return (
+                        <label
+                          key={u.id}
+                          className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition ${
+                            isChecked
+                              ? "bg-brand-50 border-brand-300 text-brand-900 dark:bg-brand-950/40 dark:border-brand-800 dark:text-brand-200 font-semibold shadow-2xs"
+                              : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handlePicCheckboxToggle(u.id)}
+                            className="rounded text-brand-500 focus:ring-brand-500/20"
+                          />
+                          <div className="truncate">
+                            <div className="truncate">{u.nama}</div>
+                            <div className="text-[10px] opacity-70 truncate font-normal">
+                              {u.role} • {u.email}
+                            </div>
                           </div>
-                        </div>
-                      </label>
-                    );
-                  })}
+                        </label>
+                      );
+                    })
+                  )}
                 </div>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                   * Email notifikasi pengingat otomatis akan dikirim ke seluruh PIC yang terpilih pada hari-H jadwal konten.
