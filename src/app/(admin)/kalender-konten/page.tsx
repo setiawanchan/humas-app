@@ -79,12 +79,14 @@ const formatToDDMMYYYY = (dateStr: string) => {
   return dateStr;
 };
 
-// Helper konversi tanggal hari ini WIB (UTC+7) ke format YYYY-MM-DD
+// Helper konversi tanggal hari ini WIB (UTC+7 / Asia/Jakarta) ke format YYYY-MM-DD
 const getTodayWIB = (): string => {
-  const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  const wib = new Date(utc + 7 * 3600000);
-  return wib.toISOString().split("T")[0];
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 };
 
 // Helper Format ke ISO YYYY-MM-DD

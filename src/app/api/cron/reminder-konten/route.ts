@@ -5,13 +5,14 @@ import { mockContentCalendar, mockUsers, ContentCalendarItem, User } from "@/lib
 import { sendGmail } from "@/lib/mail/mailer";
 import { generateReminderEmailHtml, ReminderContentData } from "@/lib/mail/template";
 
-// Helper konversi tanggal hari ini WIB (UTC+7) ke format YYYY-MM-DD
+// Helper konversi tanggal hari ini WIB (UTC+7 / Asia/Jakarta) ke format YYYY-MM-DD
 function getTodayWIB(): string {
-  const now = new Date();
-  // UTC offset +7 jam (420 menit)
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  const wib = new Date(utc + 7 * 3600000);
-  return wib.toISOString().split("T")[0];
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 export async function GET(request: Request) {
