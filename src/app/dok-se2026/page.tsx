@@ -1422,11 +1422,11 @@ export default function Dokse2026Page() {
           onClose={() => setIsDashboardModalOpen(false)}
           showCloseButton={true}
           isFullscreen={true}
-          className="p-4 md:p-6 bg-gray-50 dark:bg-gray-900"
+          className="p-3 sm:p-5 md:p-6 bg-white dark:bg-gray-900 min-h-screen text-gray-900 dark:text-white"
         >
-          <div className="max-w-[1600px] mx-auto space-y-5 h-full flex flex-col justify-between">
+          <div className="max-w-[1600px] mx-auto space-y-4 sm:space-y-5 h-full flex flex-col justify-between">
             {/* Header Dialog Dashboard */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 pr-12 sm:pr-16">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-brand-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">
                   📊
@@ -1596,183 +1596,347 @@ export default function Dokse2026Page() {
 
                 {/* Content Table Container Full Height */}
                 <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs">
-                  {/* LEVEL 1: TABEL KECAMATAN (Klik Baris untuk Buka Popup / Detail Desa) */}
+                  {/* LEVEL 1: TABEL KECAMATAN (Klik Baris untuk Buka Detail Desa) */}
                   {dashSelectedKec === "all" && (
-                    <div>
-                      <div className="bg-gray-50 dark:bg-gray-700/60 p-3 border-b border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center justify-between">
-                        <span>Daftar Seluruh Kecamatan BPS Kabupaten Lebak</span>
-                        <span className="text-brand-600 dark:text-brand-400 font-semibold">*Klik baris kecamatan untuk melihat daftar desa</span>
+                    <div className="p-2 sm:p-3 space-y-2.5">
+                      <div className="bg-gray-50 dark:bg-gray-700/60 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                        <span>🏛️ Rekapitulasi Seluruh 28 Kecamatan (BPS Kab. Lebak)</span>
+                        <span className="text-brand-600 dark:text-brand-400 font-semibold text-[11px] hidden sm:inline">*Klik kecamatan untuk rincian desa</span>
                       </div>
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[11px]">
-                            <th className="py-3 px-4 w-24">Kode</th>
-                            <th className="py-3 px-4 min-w-[220px]">Nama Kecamatan</th>
-                            <th className="py-3 px-4 text-center w-28">Total SLS</th>
-                            <th className="py-3 px-4 text-center w-28 text-emerald-600">Lengkap</th>
-                            <th className="py-3 px-4 text-center w-28 text-rose-600">Tidak Lengkap</th>
-                            <th className="py-3 px-4 text-center w-48">Progres Capaian</th>
-                            <th className="py-3 px-4 text-center w-28">Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                          {kecProgressList.map((k) => {
-                            const pct = Math.round((k.lengkap / (k.total || 1)) * 100);
-                            return (
-                              <tr
-                                key={k.kode}
-                                onClick={() => {
-                                  setDashSelectedKec(k.kode);
-                                  setDashSelectedDesa("all");
-                                }}
-                                className="hover:bg-brand-50/70 dark:hover:bg-brand-950/40 cursor-pointer transition"
-                              >
-                                <td className="py-3 px-4 font-mono font-bold text-brand-600">{k.kode}</td>
-                                <td className="py-3 px-4 font-bold text-gray-900 dark:text-white text-sm">{k.nama}</td>
-                                <td className="py-3 px-4 text-center font-bold text-gray-700 dark:text-gray-300">{k.total}</td>
-                                <td className="py-3 px-4 text-center font-bold text-emerald-600">{k.lengkap}</td>
-                                <td className="py-3 px-4 text-center font-bold text-rose-600">{k.tidakLengkap}</td>
-                                <td className="py-3 px-4 text-center">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <div className="w-28 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                                      <div
-                                        className={`h-2.5 rounded-full transition-all ${
-                                          pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
-                                        }`}
-                                        style={{ width: `${pct}%` }}
-                                      />
-                                    </div>
-                                    <span className="font-extrabold text-xs text-gray-900 dark:text-white w-9 text-right">{pct}%</span>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  <span className="px-2.5 py-1 rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-400 font-bold text-[11px] hover:underline">
-                                    Lihat Desa ➔
+
+                      {/* Desktop View: 2 Kolom Berdampingan (14 kiri, 14 kanan) - 1 Layar Penuh Tanpa Scroll */}
+                      <div className="hidden lg:grid lg:grid-cols-2 gap-3">
+                        {[
+                          kecProgressList.slice(0, Math.ceil(kecProgressList.length / 2)),
+                          kecProgressList.slice(Math.ceil(kecProgressList.length / 2)),
+                        ].map((group, groupIdx) => (
+                          <div key={groupIdx} className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[10px]">
+                                  <th className="py-1.5 px-2.5 w-12 text-center">Kd</th>
+                                  <th className="py-1.5 px-2.5">Kecamatan</th>
+                                  <th className="py-1.5 px-2 text-center w-14">SLS</th>
+                                  <th className="py-1.5 px-2 text-center w-24 text-emerald-600">L / TL</th>
+                                  <th className="py-1.5 px-2 text-center w-36">Progres</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-[11px]">
+                                {group.map((k) => {
+                                  const pct = Math.round((k.lengkap / (k.total || 1)) * 100);
+                                  return (
+                                    <tr
+                                      key={k.kode}
+                                      onClick={() => {
+                                        setDashSelectedKec(k.kode);
+                                        setDashSelectedDesa("all");
+                                      }}
+                                      className="hover:bg-brand-50/70 dark:hover:bg-brand-950/40 cursor-pointer transition select-none"
+                                    >
+                                      <td className="py-1.5 px-2.5 text-center font-mono font-bold text-brand-600 text-[11px]">{k.kode}</td>
+                                      <td className="py-1.5 px-2.5 font-bold text-gray-900 dark:text-white truncate max-w-[150px]">{k.nama}</td>
+                                      <td className="py-1.5 px-2 text-center font-semibold text-gray-600 dark:text-gray-400">{k.total}</td>
+                                      <td className="py-1.5 px-2 text-center font-bold">
+                                        <span className="text-emerald-600">{k.lengkap}</span>
+                                        <span className="text-gray-400 mx-1">/</span>
+                                        <span className="text-rose-500">{k.tidakLengkap}</span>
+                                      </td>
+                                      <td className="py-1.5 px-2 text-center">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div
+                                              className={`h-2 rounded-full transition-all ${
+                                                pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                              }`}
+                                              style={{ width: `${pct}%` }}
+                                            />
+                                          </div>
+                                          <span className="font-extrabold text-[11px] text-gray-900 dark:text-white w-8 text-right">{pct}%</span>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Mobile & Tablet View: Kartu Minimalis Ramping */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-2">
+                        {kecProgressList.map((k) => {
+                          const pct = Math.round((k.lengkap / (k.total || 1)) * 100);
+                          return (
+                            <div
+                              key={k.kode}
+                              onClick={() => {
+                                setDashSelectedKec(k.kode);
+                                setDashSelectedDesa("all");
+                              }}
+                              className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-brand-500 cursor-pointer shadow-xs transition"
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-400">
+                                    {k.kode}
                                   </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                  <h4 className="font-bold text-xs text-gray-900 dark:text-white">{k.nama}</h4>
+                                </div>
+                                <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                                  pct === 100
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : pct >= 50
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                    : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                }`}>
+                                  {pct}%
+                                </span>
+                              </div>
+
+                              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden mb-2">
+                                <div
+                                  className={`h-2 rounded-full transition-all ${
+                                    pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                  }`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                                <span>Total: <strong>{k.total}</strong> SLS</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-emerald-600 font-semibold">✓ {k.lengkap}</span>
+                                  <span className="text-rose-500 font-semibold">✗ {k.tidakLengkap}</span>
+                                </div>
+                                <span className="text-brand-600 dark:text-brand-400 font-bold text-[10px]">Lihat Desa ➔</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
                   {/* LEVEL 2: TABEL DESA / KELURAHAN (Klik Baris untuk Buka SLS) */}
                   {dashSelectedKec !== "all" && dashSelectedDesa === "all" && (
-                    <div>
-                      <div className="bg-brand-50 dark:bg-brand-950/40 p-3 border-b border-brand-100 dark:border-brand-900 text-xs font-bold text-brand-700 dark:text-brand-300 flex items-center justify-between">
-                        <span>📍 Rekapitulasi Seluruh Desa pada Kecamatan {kecProgressList.find((k) => k.kode === dashSelectedKec)?.nama}</span>
-                        <span className="font-semibold">*Klik baris desa untuk merinci status tiap SLS</span>
+                    <div className="p-2 sm:p-3 space-y-2.5">
+                      <div className="bg-brand-50 dark:bg-brand-950/40 p-2.5 rounded-xl border border-brand-100 dark:border-brand-900 text-xs font-bold text-brand-700 dark:text-brand-300 flex items-center justify-between">
+                        <span>📍 Rekapitulasi Desa ({desaProgressList.length}) - Kec. {kecProgressList.find((k) => k.kode === dashSelectedKec)?.nama}</span>
+                        <span className="font-semibold text-[11px] hidden sm:inline">*Klik baris desa untuk merinci tiap SLS</span>
                       </div>
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[11px]">
-                            <th className="py-3 px-4 w-24">Kode</th>
-                            <th className="py-3 px-4 min-w-[220px]">Nama Desa / Kelurahan</th>
-                            <th className="py-3 px-4 text-center w-28">Total SLS</th>
-                            <th className="py-3 px-4 text-center w-28 text-emerald-600">Lengkap</th>
-                            <th className="py-3 px-4 text-center w-28 text-rose-600">Tidak Lengkap</th>
-                            <th className="py-3 px-4 text-center w-48">Progres Capaian</th>
-                            <th className="py-3 px-4 text-center w-28">Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                          {desaProgressList.map((d) => {
-                            const pct = Math.round((d.lengkap / (d.total || 1)) * 100);
-                            return (
-                              <tr
-                                key={d.kode}
-                                onClick={() => setDashSelectedDesa(d.kode)}
-                                className="hover:bg-purple-50/70 dark:hover:bg-purple-950/40 cursor-pointer transition"
-                              >
-                                <td className="py-3 px-4 font-mono font-bold text-purple-600">{d.kode}</td>
-                                <td className="py-3 px-4 font-bold text-gray-900 dark:text-white text-sm">{d.nama}</td>
-                                <td className="py-3 px-4 text-center font-bold text-gray-700 dark:text-gray-300">{d.total}</td>
-                                <td className="py-3 px-4 text-center font-bold text-emerald-600">{d.lengkap}</td>
-                                <td className="py-3 px-4 text-center font-bold text-rose-600">{d.tidakLengkap}</td>
-                                <td className="py-3 px-4 text-center">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <div className="w-28 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                                      <div
-                                        className={`h-2.5 rounded-full transition-all ${
-                                          pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
-                                        }`}
-                                        style={{ width: `${pct}%` }}
-                                      />
-                                    </div>
-                                    <span className="font-extrabold text-xs text-gray-900 dark:text-white w-9 text-right">{pct}%</span>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  <span className="px-2.5 py-1 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400 font-bold text-[11px] hover:underline">
-                                    Detail SLS ➔
+
+                      {/* Desktop View: 2 Kolom Berdampingan jika > 8 desa */}
+                      <div className={desaProgressList.length > 8 ? "hidden lg:grid lg:grid-cols-2 gap-3" : "hidden lg:block"}>
+                        {(desaProgressList.length > 8
+                          ? [
+                              desaProgressList.slice(0, Math.ceil(desaProgressList.length / 2)),
+                              desaProgressList.slice(Math.ceil(desaProgressList.length / 2)),
+                            ]
+                          : [desaProgressList]
+                        ).map((group, groupIdx) => (
+                          <div key={groupIdx} className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[10px]">
+                                  <th className="py-1.5 px-2.5 w-12 text-center">Kd</th>
+                                  <th className="py-1.5 px-2.5">Desa / Kelurahan</th>
+                                  <th className="py-1.5 px-2 text-center w-14">SLS</th>
+                                  <th className="py-1.5 px-2 text-center w-24 text-emerald-600">L / TL</th>
+                                  <th className="py-1.5 px-2 text-center w-36">Progres</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-[11px]">
+                                {group.map((d) => {
+                                  const pct = Math.round((d.lengkap / (d.total || 1)) * 100);
+                                  return (
+                                    <tr
+                                      key={d.kode}
+                                      onClick={() => setDashSelectedDesa(d.kode)}
+                                      className="hover:bg-purple-50/70 dark:hover:bg-purple-950/40 cursor-pointer transition select-none"
+                                    >
+                                      <td className="py-1.5 px-2.5 text-center font-mono font-bold text-purple-600 text-[11px]">{d.kode}</td>
+                                      <td className="py-1.5 px-2.5 font-bold text-gray-900 dark:text-white truncate max-w-[150px]">{d.nama}</td>
+                                      <td className="py-1.5 px-2 text-center font-semibold text-gray-600 dark:text-gray-400">{d.total}</td>
+                                      <td className="py-1.5 px-2 text-center font-bold">
+                                        <span className="text-emerald-600">{d.lengkap}</span>
+                                        <span className="text-gray-400 mx-1">/</span>
+                                        <span className="text-rose-500">{d.tidakLengkap}</span>
+                                      </td>
+                                      <td className="py-1.5 px-2 text-center">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div
+                                              className={`h-2 rounded-full transition-all ${
+                                                pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                              }`}
+                                              style={{ width: `${pct}%` }}
+                                            />
+                                          </div>
+                                          <span className="font-extrabold text-[11px] text-gray-900 dark:text-white w-8 text-right">{pct}%</span>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Mobile View: Kartu Minimalis Ramping */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-2">
+                        {desaProgressList.map((d) => {
+                          const pct = Math.round((d.lengkap / (d.total || 1)) * 100);
+                          return (
+                            <div
+                              key={d.kode}
+                              onClick={() => setDashSelectedDesa(d.kode)}
+                              className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-purple-500 cursor-pointer shadow-xs transition"
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
+                                    {d.kode}
                                   </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                  <h4 className="font-bold text-xs text-gray-900 dark:text-white">{d.nama}</h4>
+                                </div>
+                                <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                                  pct === 100
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : pct >= 50
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                    : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                }`}>
+                                  {pct}%
+                                </span>
+                              </div>
+
+                              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden mb-2">
+                                <div
+                                  className={`h-2 rounded-full transition-all ${
+                                    pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                  }`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                                <span>Total: <strong>{d.total}</strong> SLS</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-emerald-600 font-semibold">✓ {d.lengkap}</span>
+                                  <span className="text-rose-500 font-semibold">✗ {d.tidakLengkap}</span>
+                                </div>
+                                <span className="text-purple-600 dark:text-purple-400 font-bold text-[10px]">Rincian SLS ➔</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
                   {/* LEVEL 3: TABEL RINCIAN DETAIL SLS / SUBSLS & KRITERIA YANG BELUM LENGKAP */}
                   {dashSelectedKec !== "all" && dashSelectedDesa !== "all" && (
-                    <div>
-                      <div className="bg-purple-50 dark:bg-purple-950/40 p-3 border-b border-purple-100 dark:border-purple-900 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center justify-between">
+                    <div className="p-2 sm:p-3 space-y-2.5">
+                      <div className="bg-purple-50 dark:bg-purple-950/40 p-2.5 rounded-xl border border-purple-100 dark:border-purple-900 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center justify-between">
                         <span>
                           📍 Rincian Detail SLS pada Desa {desaProgressList.find((d) => d.kode === dashSelectedDesa)?.nama} ({slsProgressList.length} Baris SLS)
                         </span>
-                        <span className="font-normal text-[11px] text-gray-500 dark:text-gray-400">*Menampilkan kriteria komponen yang belum lengkap</span>
+                        <span className="font-normal text-[11px] text-gray-500 dark:text-gray-400 hidden sm:inline">*Menampilkan kriteria komponen yang belum lengkap</span>
                       </div>
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[11px]">
-                            <th className="py-3 px-4 w-40">ID SubSLS</th>
-                            <th className="py-3 px-4 min-w-[200px]">Nama SLS / SubSLS</th>
-                            <th className="py-3 px-4 text-center w-36">Status Kelengkapan</th>
-                            <th className="py-3 px-4 min-w-[300px]">Bagian Komponen Belum Lengkap</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                          {slsProgressList.map((item) => (
-                            <tr key={item.idsubsls} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                              <td className="py-3 px-4 font-mono font-bold text-brand-600 text-xs">{item.idsubsls}</td>
-                              <td className="py-3 px-4 font-bold text-gray-900 dark:text-white text-xs">{item.nama_sls}</td>
-                              <td className="py-3 px-4 text-center">
-                                <span
-                                  className={`px-3 py-1 rounded-full text-xs font-bold inline-block ${
-                                    item.statusPenerimaan === "Lengkap"
-                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300"
-                                      : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-300"
-                                  }`}
-                                >
-                                  {item.statusPenerimaan}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4">
-                                {item.missingParts.length === 0 ? (
-                                  <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
-                                    <span>✓</span> Semua 4 Komponen Utama Lengkap & Terisi
-                                  </span>
-                                ) : (
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    {item.missingParts.map((mp, idx) => (
-                                      <span
-                                        key={idx}
-                                        className="px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[11px] font-semibold"
-                                      >
-                                        ⚠️ Belum Ada: {mp}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </td>
+
+                      {/* Desktop Table View */}
+                      <div className="hidden sm:block rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[10px]">
+                              <th className="py-2 px-3 w-36">ID SubSLS</th>
+                              <th className="py-2 px-3 min-w-[180px]">Nama SLS / SubSLS</th>
+                              <th className="py-2 px-3 text-center w-32">Status</th>
+                              <th className="py-2 px-3 min-w-[260px]">Komponen Belum Lengkap</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-[11px]">
+                            {slsProgressList.map((item) => (
+                              <tr key={item.idsubsls} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                <td className="py-2 px-3 font-mono font-bold text-brand-600 text-xs">{item.idsubsls}</td>
+                                <td className="py-2 px-3 font-bold text-gray-900 dark:text-white text-xs">{item.nama_sls}</td>
+                                <td className="py-2 px-3 text-center">
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold inline-block ${
+                                      item.statusPenerimaan === "Lengkap"
+                                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300"
+                                        : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-300"
+                                    }`}
+                                  >
+                                    {item.statusPenerimaan}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3">
+                                  {item.missingParts.length === 0 ? (
+                                    <span className="text-emerald-600 font-bold text-[11px] flex items-center gap-1">
+                                      <span>✓</span> Lengkap
+                                    </span>
+                                  ) : (
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      {item.missingParts.map((mp, idx) => (
+                                        <span
+                                          key={idx}
+                                          className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[10px] font-semibold"
+                                        >
+                                          ⚠️ {mp}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile View: Kartu SLS */}
+                      <div className="space-y-2 sm:hidden">
+                        {slsProgressList.map((item) => (
+                          <div
+                            key={item.idsubsls}
+                            className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-mono text-[11px] font-bold text-brand-600">{item.idsubsls}</span>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  item.statusPenerimaan === "Lengkap"
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                }`}
+                              >
+                                {item.statusPenerimaan}
+                              </span>
+                            </div>
+                            <div className="font-bold text-xs text-gray-900 dark:text-white mb-2">{item.nama_sls}</div>
+                            {item.missingParts.length === 0 ? (
+                              <div className="text-emerald-600 font-bold text-[11px] flex items-center gap-1">
+                                <span>✓</span> Semua 4 Komponen Utama Lengkap
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {item.missingParts.map((mp, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[10px] font-semibold"
+                                  >
+                                    ⚠️ {mp}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
