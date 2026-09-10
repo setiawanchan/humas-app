@@ -87,10 +87,8 @@ export async function authenticateUserFromSupabase(
 
   const user = data.find(
     (u) =>
-      u.password === hashedInputPass ||
-      u.password === pass || // Dukungan transisi untuk user lama
-      pass === "admin123" ||
-      u.password === defaultAdminHash
+      u.password === pass || // Jika di DB disimpan teks biasa (misal Portal@BPS24)
+      u.password === hashedInputPass // Jika di DB disimpan hash SHA-256
   );
 
   return (user as User) || null;

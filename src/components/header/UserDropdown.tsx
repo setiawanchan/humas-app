@@ -112,28 +112,7 @@ export default function UserDropdown() {
           </span>
         </div>
 
-        <div className="py-2">
-          <Link
-            href="/login"
-            onClick={closeDropdown}
-            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-brand-600 dark:text-brand-400 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-950/30 transition"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-              />
-            </svg>
-            Ganti Pengguna (Simulasi)
-          </Link>
-        </div>
+
 
         <button
           onClick={handleLogout}
