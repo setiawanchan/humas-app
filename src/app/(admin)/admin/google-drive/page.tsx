@@ -177,15 +177,16 @@ export default function GoogleDriveAdminPage() {
             </h3>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Tersimpan langsung di dalam folder tahunan di root drive BPS:
+            Tersimpan di dalam sub-folder <strong>Dokumentasi</strong>:
           </p>
           <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-3 font-mono text-xs text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700/60 leading-relaxed">
-            📁 [Parent Folder]<br />
-            &nbsp;&nbsp;└── 📁 2026<br />
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📁 01.Januari<br />
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📁 20260112_Sosialisasi SE2026<br />
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── 📄 Foto1.jpg<br />
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📄 Notulen.pdf
+            📁 Induk (13TsWALJI38xE55YxY1QOT9RsTpowq5y-)<br />
+            &nbsp;&nbsp;└── 📁 Dokumentasi<br />
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📁 2026<br />
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📁 01.Januari<br />
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📁 20260112_Sosialisasi SE2026<br />
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── 📄 Foto1.jpg<br />
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📄 Notulen.pdf
           </div>
         </div>
 
@@ -198,10 +199,10 @@ export default function GoogleDriveAdminPage() {
             </h3>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Tersimpan rapi di dalam sub-folder khusus <strong>Arsip</strong>:
+            Tersimpan di dalam sub-folder <strong>Arsip</strong>:
           </p>
           <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-3 font-mono text-xs text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700/60 leading-relaxed">
-            📁 [Parent Folder]<br />
+            📁 Induk (13TsWALJI38xE55YxY1QOT9RsTpowq5y-)<br />
             &nbsp;&nbsp;└── 📁 Arsip<br />
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📁 2026<br />
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── 📁 01.Januari<br />

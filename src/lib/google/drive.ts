@@ -158,9 +158,12 @@ export function formatActivityFolderName(dateStr: string, title: string): string
   return `${yyyymmdd}_${cleanTitle}`;
 }
 
-// 3. Buat Hirarki Folder:
-// Dokumentasi: [Parent] -> [Tahun] -> [Bulan] -> [Kegiatan]
-// Arsip:       [Parent] -> [Arsip] -> [Tahun] -> [Bulan] -> [Kegiatan]
+// 3. Buat Hirarki Folder Simetris:
+// [Parent Folder: 13TsWALJI38xE55YxY1QOT9RsTpowq5y-]
+//   ├── 📁 Dokumentasi
+//   │     └── 📁 [Tahun] ➔ 📁 [Bulan] ➔ 📁 [YYYYMMDD_Nama Kegiatan]
+//   └── 📁 Arsip
+//         └── 📁 [Tahun] ➔ 📁 [Bulan] ➔ 📁 [YYYYMMDD_Nama Kegiatan/Dokumen]
 export async function createActivityFolderHierarchy(
   dateStr: string,
   title: string,
@@ -168,13 +171,12 @@ export async function createActivityFolderHierarchy(
 ): Promise<{ folderId: string; webViewLink: string }> {
   const rootParentFolderId = process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID || undefined;
 
-  let baseParentId = rootParentFolderId;
+  // Tentukan nama folder modul utama: "Dokumentasi" atau "Arsip"
+  const moduleFolderName = moduleType === "arsip" ? "Arsip" : "Dokumentasi";
 
-  // Jika modul Arsip, pastikan ada folder khusus "Arsip" di level teratas
-  if (moduleType === "arsip") {
-    const arsipRootFolder = await getOrCreateFolder("Arsip", rootParentFolderId);
-    baseParentId = arsipRootFolder.id;
-  }
+  // 1. Buat / Dapatkan folder modul di dalam Root Parent Folder
+  const moduleRootFolder = await getOrCreateFolder(moduleFolderName, rootParentFolderId);
+  const baseParentId = moduleRootFolder.id;
 
   let yearStr = new Date().getFullYear().toString();
   const d = new Date(dateStr);
