@@ -26,13 +26,7 @@ export default function Dokse2026Page() {
     async function loadData() {
       setIsLoadingSupabase(true);
       const remoteData = await getDokseDataFromSupabase();
-      if (remoteData && remoteData.length > 0) {
-        setDataList(remoteData);
-      } else {
-        // Seeding awal jika database Supabase masih kosong
-        setDataList(mockDokseData);
-        await bulkInsertDokseDataToSupabase(mockDokseData);
-      }
+      setDataList(remoteData || []);
       setIsLoadingSupabase(false);
     }
 
