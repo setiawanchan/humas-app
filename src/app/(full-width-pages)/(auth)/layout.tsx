@@ -2,7 +2,6 @@ import GridShape from "@/components/common/GridShape";
 import ThemeTogglerTwo from "@/components/common/ThemeTogglerTwo";
 
 import { ThemeProvider } from "@/context/ThemeContext";
-import Image from "next/image";
 import Link from "next/link";
 import React from "react";
 
@@ -20,17 +19,22 @@ export default function AuthLayout({
             <div className="relative items-center justify-center  flex z-1">
               {/* <!-- ===== Common Grid Shape Start ===== --> */}
               <GridShape />
-              <div className="flex flex-col items-center max-w-xs">
-                <Link href="/" className="block mb-4">
-                  <Image
-                    width={231}
-                    height={48}
-                    src="./images/logo/auth-logo.svg"
-                    alt="Logo"
-                  />
+              <div className="flex flex-col items-center max-w-xs text-center">
+                <Link href="/" className="flex items-center gap-3 mb-4">
+                  <div className="h-12 w-12 rounded-2xl bg-brand-500 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-brand-500/30">
+                    BPS
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <span className="font-bold text-white text-lg leading-tight">
+                      Humas BPS
+                    </span>
+                    <span className="text-xs text-brand-300 font-medium">
+                      Kabupaten Lebak
+                    </span>
+                  </div>
                 </Link>
-                <p className="text-center text-gray-400 dark:text-white/60">
-                  Free and Open-Source Tailwind CSS Admin Dashboard Template
+                <p className="text-center text-gray-400 dark:text-white/60 text-sm">
+                  Sistem Manajemen Hubungan Masyarakat Internal BPS Kabupaten Lebak
                 </p>
               </div>
             </div>

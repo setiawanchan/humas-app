@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import {
@@ -9,7 +9,13 @@ import {
   mockArsip,
   mockUsers,
   ContentCalendarItem,
+  Documentation,
+  parsePicIds,
 } from "@/lib/mock-data";
+import {
+  getKalenderKontenFromSupabase,
+  getDokumentasiFromSupabase,
+} from "@/lib/supabase/kalender-service";
 import DocumentationChart from "@/components/dashboard/DocumentationChart";
 import ContentCalendarStatusChart from "@/components/dashboard/ContentCalendarStatusChart";
 
@@ -39,9 +45,14 @@ const formatIndonesianDate = (dateStr: string) => {
   return dateStr;
 };
 
-const getPicName = (picId: string) => {
-  const user = mockUsers.find((u) => u.id === picId);
-  return user ? user.nama : picId;
+const getPicName = (pic: string | string[] | undefined) => {
+  const ids = parsePicIds(pic);
+  if (ids.length === 0) return "-";
+  const names = ids.map((id) => {
+    const user = mockUsers.find((u) => u.id === id);
+    return user ? user.nama : id;
+  });
+  return names.join(", ");
 };
 
 const getPlatformLabel = (platform: ContentCalendarItem["platform"]) => {
@@ -64,10 +75,39 @@ const getPlatformLabel = (platform: ContentCalendarItem["platform"]) => {
 export default function DashboardPage() {
   const { currentUser } = useAuth();
 
+  const [calendarItems, setCalendarItems] = useState<ContentCalendarItem[]>([]);
+  const [docItems, setDocItems] = useState<Documentation[]>([]);
+
+  useEffect(() => {
+    async function loadDashboardData() {
+      try {
+        const [kalenderData, dokData] = await Promise.all([
+          getKalenderKontenFromSupabase(),
+          getDokumentasiFromSupabase(),
+        ]);
+
+        if (kalenderData && kalenderData.length > 0) {
+          setCalendarItems(kalenderData as ContentCalendarItem[]);
+        } else {
+          setCalendarItems(mockContentCalendar);
+        }
+
+        if (dokData && dokData.length > 0) {
+          setDocItems(dokData as Documentation[]);
+        } else {
+          setDocItems(mockDocumentation);
+        }
+      } catch (err) {
+        console.error("Error loading dashboard data:", err);
+      }
+    }
+    loadDashboardData();
+  }, []);
+
   // Filter khusus 1 minggu terdekat & BELUM TERBIT (draft, siap, terjadwal)
-  const upcomingContent = [...mockContentCalendar]
+  const upcomingContent = [...calendarItems]
     .filter((item) => item.status !== "terbit" && item.status !== "selesai")
-    .sort((a, b) => a.tanggal.localeCompare(b.tanggal))
+    .sort((a, b) => (a.tanggal || "").localeCompare(b.tanggal || ""))
     .slice(0, 3);
 
   return (
@@ -130,11 +170,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 p-5 shadow-sm flex items-center gap-4">
           <div className="h-12 w-12 rounded-xl bg-orange-100 dark:bg-orange-950/40 text-brand-600 flex items-center justify-center font-bold text-xl">
-            {mockDocumentation.length}
+            {docItems.length}
           </div>
           <div>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {mockDocumentation.length}
+              {docItems.length}
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
               Dokumentasi Kegiatan
@@ -144,11 +184,11 @@ export default function DashboardPage() {
 
         <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 p-5 shadow-sm flex items-center gap-4">
           <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center font-bold text-xl">
-            {mockContentCalendar.length}
+            {calendarItems.length}
           </div>
           <div>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {mockContentCalendar.length}
+              {calendarItems.length}
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
               Item Kalender Konten

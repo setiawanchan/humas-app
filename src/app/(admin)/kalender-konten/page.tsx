@@ -7,9 +7,12 @@ import { useAuth } from "@/context/AuthContext";
 import {
   mockContentCalendar,
   ContentCalendarItem,
+  User,
   mockUsers,
+  parsePicIds,
 } from "@/lib/mock-data";
 import { Modal } from "@/components/ui/modal";
+import { getUsersFromSupabase } from "@/lib/supabase/user-service";
 
 // List Pilihan Platform Media Sosial
 const PLATFORM_OPTIONS: { id: ContentCalendarItem["platform"]; label: string; icon: string }[] = [
@@ -77,6 +80,16 @@ const formatToDDMMYYYY = (dateStr: string) => {
   return dateStr;
 };
 
+// Helper konversi tanggal hari ini WIB (UTC+7 / Asia/Jakarta) ke format YYYY-MM-DD
+const getTodayWIB = (): string => {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+};
+
 // Helper Format ke ISO YYYY-MM-DD
 const formatToISO = (dateStr: string) => {
   if (!dateStr) return "";
@@ -87,10 +100,26 @@ const formatToISO = (dateStr: string) => {
   return dateStr;
 };
 
-// Helper Nama PIC
-const getPicName = (picId: string) => {
-  const user = mockUsers.find((u) => u.id === picId);
-  return user ? user.nama : picId;
+// Helper Nama PIC (Support single string, JSON string, atau array of IDs)
+const getPicNames = (
+  pic: string | string[] | undefined,
+  userList?: User[]
+): string[] => {
+  const ids = parsePicIds(pic);
+  if (ids.length === 0) return ["-"];
+  const source = userList && userList.length > 0 ? userList : mockUsers;
+  return ids.map((id) => {
+    const user = source.find((u) => u.id === id);
+    return user ? user.nama : id;
+  });
+};
+
+const getPicName = (
+  pic: string | string[] | undefined,
+  userList?: User[]
+): string => {
+  const names = getPicNames(pic, userList);
+  return names.join(", ");
 };
 
 // Helper Styling Badge Status
@@ -130,6 +159,8 @@ const getStatusLabel = (status: ContentCalendarItem["status"]) => {
 import {
   getKalenderKontenFromSupabase,
   insertKalenderKontenToSupabase,
+  updateKalenderKontenInSupabase,
+  deleteKalenderKontenFromSupabase,
 } from "@/lib/supabase/kalender-service";
 
 const getPlatformLabel = (platform: ContentCalendarItem["platform"]) => {
@@ -144,13 +175,23 @@ export default function KalenderKontenPage() {
   const canManage =
     currentUser?.role === "administrator" || currentUser?.role === "admin_humas";
 
+  // State Data Pengguna Asli dari Supabase untuk PIC
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+
   // State Utama Data Items
   const [items, setItems] = useState<ContentCalendarItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchKalender() {
+    async function loadData() {
       setIsLoading(true);
+      // 1. Fetch data pengguna dari Supabase
+      const usersData = await getUsersFromSupabase();
+      if (usersData) {
+        setAvailableUsers(usersData.filter((u) => u.is_active));
+      }
+
+      // 2. Fetch data kalender konten dari Supabase
       const remote = await getKalenderKontenFromSupabase();
       if (remote && remote.length > 0) {
         setItems(remote as any);
@@ -159,15 +200,16 @@ export default function KalenderKontenPage() {
       }
       setIsLoading(false);
     }
-    fetchKalender();
+    loadData();
   }, []);
 
   // State Tampilan Mode: "calendar" | "list"
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
 
-  // State Tanggal yang sedang dilihat untuk Kalender Bulanan (Default Sept 2026 atau tanggal saat ini)
+  // State Tanggal yang sedang dilihat untuk Kalender Bulanan (Default Bulan & Tahun Berjalan WIB)
   const [currentDate, setCurrentDate] = useState(() => {
-    return new Date(2026, 8, 1); // 8 = September (0-indexed)
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
   });
 
   // State Search & Filter
@@ -181,25 +223,30 @@ export default function KalenderKontenPage() {
   // State Modal Form (Tambah / Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ContentCalendarItem | null>(null);
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   
   // State Copy Caption Feedback
   const [isCopied, setIsCopied] = useState(false);
 
-  // State Form Input
+  // State Form Input (Support Multiple PIC)
   const [formData, setFormData] = useState({
     judul: "",
     selectedPlatforms: ["instagram"] as ContentCalendarItem["platform"][], // Multi-select untuk Create mode
     platform: "instagram" as ContentCalendarItem["platform"], // Single platform untuk Edit mode
-    tanggal: new Date().toISOString().split("T")[0],
+    tanggal: getTodayWIB(),
     status: "draft" as ContentCalendarItem["status"],
     drive_link_bahan: "",
     deskripsi: "",
     caption: "",
-    pic: currentUser?.id || "u2",
+    pic: [currentUser?.id || "u2"] as string[], // Multi-select array user IDs
   });
 
   // State Modal Konfirmasi Hapus
   const [deletingItem, setDeletingItem] = useState<ContentCalendarItem | null>(null);
+
+  // State Notifikasi Pengingat Hari Ini
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [reminderResult, setReminderResult] = useState<any>(null);
 
   // Ref Flatpickr Date Picker
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -208,7 +255,7 @@ export default function KalenderKontenPage() {
     if (isFormOpen && dateInputRef.current) {
       const initialDate = formData.tanggal
         ? formatToDDMMYYYY(formData.tanggal)
-        : formatToDDMMYYYY(new Date().toISOString().split("T")[0]);
+        : formatToDDMMYYYY(getTodayWIB());
 
       const fp = flatpickr(dateInputRef.current, {
         dateFormat: "d-m-Y",
@@ -300,7 +347,7 @@ export default function KalenderKontenPage() {
         const matches =
           item.judul.toLowerCase().includes(q) ||
           item.deskripsi.toLowerCase().includes(q) ||
-          getPicName(item.pic).toLowerCase().includes(q);
+          getPicName(item.pic, availableUsers).toLowerCase().includes(q);
         if (!matches) return false;
       }
 
@@ -350,6 +397,25 @@ export default function KalenderKontenPage() {
     });
   };
 
+  // Toggle Checkbox PIC
+  const handlePicCheckboxToggle = (userId: string) => {
+    setFormData((prev) => {
+      const exists = prev.pic.includes(userId);
+      if (exists) {
+        if (prev.pic.length === 1) return prev; // Minimal 1 PIC terpilih
+        return {
+          ...prev,
+          pic: prev.pic.filter((id) => id !== userId),
+        };
+      } else {
+        return {
+          ...prev,
+          pic: [...prev.pic, userId],
+        };
+      }
+    });
+  };
+
   // Open Form Modal (Tambah Baru)
   const handleOpenCreateForm = (initialDateStr?: string) => {
     setEditingItem(null);
@@ -357,12 +423,12 @@ export default function KalenderKontenPage() {
       judul: "",
       selectedPlatforms: ["instagram"],
       platform: "instagram",
-      tanggal: initialDateStr || new Date().toISOString().split("T")[0],
+      tanggal: initialDateStr || getTodayWIB(),
       status: "draft",
       drive_link_bahan: "",
       deskripsi: "",
       caption: "",
-      pic: currentUser?.id || "u2",
+      pic: [currentUser?.id || "u2"],
     });
     setIsFormOpen(true);
   };
@@ -371,6 +437,7 @@ export default function KalenderKontenPage() {
   const handleOpenEditForm = (item: ContentCalendarItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setEditingItem(item);
+    const picArray = Array.isArray(item.pic) ? item.pic : [item.pic || currentUser?.id || "u2"];
     setFormData({
       judul: item.judul,
       selectedPlatforms: [item.platform],
@@ -380,72 +447,163 @@ export default function KalenderKontenPage() {
       drive_link_bahan: item.drive_link_bahan || "",
       deskripsi: item.deskripsi,
       caption: item.caption || "",
-      pic: item.pic,
+      pic: picArray,
     });
     setSelectedItem(null);
     setIsFormOpen(true);
   };
 
   // Quick Change Status dari Detail Modal
-  const handleQuickStatusChange = (newStatus: ContentCalendarItem["status"]) => {
+  const handleQuickStatusChange = async (newStatus: ContentCalendarItem["status"]) => {
     if (!selectedItem) return;
-    // TODO: Replace with Supabase update query
+    // 1. Optimistic update di state lokal
     setItems((prev) =>
       prev.map((i) => (i.id === selectedItem.id ? { ...i, status: newStatus } : i))
     );
     setSelectedItem((prev) => (prev ? { ...prev, status: newStatus } : null));
+
+    // 2. Simpan ke Supabase jika ada di database
+    try {
+      await updateKalenderKontenInSupabase(selectedItem.id, { status: newStatus });
+    } catch (err) {
+      console.warn("Gagal update status di Supabase:", err);
+    }
+  };
+
+  // Handler Trigger Manual Pengingat Hari Ini ke Gmail PIC
+  const handleSendTodayReminders = async () => {
+    setIsSendingReminder(true);
+    setReminderResult(null);
+    try {
+      const todayDate = getTodayWIB();
+      const res = await fetch(`/api/cron/reminder-konten?date=${todayDate}`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setReminderResult({
+          success: false,
+          error: data?.error || `HTTP ${res.status}: Gagal memproses pengingat`,
+          message: data?.message || data?.error || "Gagal memproses permintaan ke server.",
+          targetDate: todayDate,
+        });
+      } else {
+        setReminderResult(data);
+      }
+    } catch (err: any) {
+      setReminderResult({
+        success: false,
+        error: err?.message || "Gagal menghubungi server pengingat.",
+        message: err?.message || "Koneksi ke server gagal.",
+      });
+    } finally {
+      setIsSendingReminder(false);
+    }
   };
 
   // Submit Form Tambah / Edit
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmittingForm(true);
 
-    if (editingItem) {
-      // Mode Edit: Mengubah 1 baris item yang spesifik
-      // TODO: Replace with Supabase update query
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === editingItem.id
-            ? {
-                ...i,
-                judul: formData.judul,
-                platform: formData.platform,
-                tanggal: formData.tanggal,
-                status: formData.status,
-                drive_link_bahan: formData.drive_link_bahan,
-                deskripsi: formData.deskripsi,
-                caption: formData.caption,
-                pic: formData.pic,
-              }
-            : i
-        )
-      );
-    } else {
-      // Mode Create: Auto-generate URL Google Drive Folder Bahan untuk setiap platform yang dipilih
-      // TODO: Replace with Google Drive API call (googleDrive.createFolder(`Bahan - ${formData.judul}`))
-      const slug = formData.judul
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
-
-      const newItems: ContentCalendarItem[] = formData.selectedPlatforms.map(
-        (plat, index) => ({
-          id: `c_${Date.now()}_${index}`,
+    try {
+      if (editingItem) {
+        // Mode Edit: Mengubah baris item yang spesifik
+        const updatedFields = {
           judul: formData.judul,
-          platform: plat,
+          platform: formData.platform,
           tanggal: formData.tanggal,
           status: formData.status,
-          drive_link_bahan: `https://drive.google.com/drive/u/0/folders/bps-lebak-bahan-${slug || Date.now()}-${plat}`,
+          drive_link_bahan: formData.drive_link_bahan,
           deskripsi: formData.deskripsi,
           caption: formData.caption,
           pic: formData.pic,
-        })
-      );
+        };
 
-      setItems((prev) => [...newItems, ...prev]);
+        // Update di Supabase
+        await updateKalenderKontenInSupabase(editingItem.id, updatedFields);
+
+        // Update state lokal
+        setItems((prev) =>
+          prev.map((i) => (i.id === editingItem.id ? { ...i, ...updatedFields } : i))
+        );
+      } else {
+        // Mode Create:
+        // 1. Buat Folder Bahan di Google Drive via /api/upload-drive (module: "kalender")
+        let generatedDriveUrl = formData.drive_link_bahan;
+
+        if (!generatedDriveUrl) {
+          try {
+            const driveFormData = new FormData();
+            driveFormData.append("judul", formData.judul);
+            driveFormData.append("tanggal", formData.tanggal);
+            driveFormData.append("module", "kalender");
+
+            const driveRes = await fetch("/api/upload-drive", {
+              method: "POST",
+              body: driveFormData,
+            });
+
+            if (driveRes.ok) {
+              const driveData = await driveRes.json();
+              if (driveData.drive_url) {
+                generatedDriveUrl = driveData.drive_url;
+              }
+            }
+          } catch (driveErr) {
+            console.warn("Gagal membuat folder Google Drive otomatis:", driveErr);
+          }
+        }
+
+        // Fallback jika Google Drive API gagal / offline
+        if (!generatedDriveUrl) {
+          const slug = formData.judul
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "");
+          generatedDriveUrl = `https://drive.google.com/drive/u/0/folders/bps-lebak-bahan-${slug || Date.now()}`;
+        }
+
+        // 2. Buat item untuk setiap platform yang dipilih dan simpan ke Supabase
+        const newlyCreated: ContentCalendarItem[] = [];
+
+        for (let i = 0; i < formData.selectedPlatforms.length; i++) {
+          const plat = formData.selectedPlatforms[i];
+          const payload = {
+            judul: formData.judul,
+            platform: plat,
+            tanggal: formData.tanggal,
+            status: formData.status,
+            drive_link_bahan: generatedDriveUrl,
+            deskripsi: formData.deskripsi,
+            caption: formData.caption,
+            pic: formData.pic,
+          };
+
+          // Simpan ke Supabase
+          const inserted = await insertKalenderKontenToSupabase(payload as any);
+          if (inserted && inserted.id) {
+            newlyCreated.push(inserted as any);
+          } else {
+            // Fallback id lokal jika supabase gagal
+            newlyCreated.push({
+              id: `c_${Date.now()}_${i}`,
+              ...payload,
+            });
+          }
+        }
+
+        // Update state lokal dengan konten baru di bagian atas
+        setItems((prev) => [...newlyCreated, ...prev]);
+      }
+
+      setIsFormOpen(false);
+    } catch (err: any) {
+      console.error("Error submitting kalender form:", err);
+      alert("Terjadi kesalahan saat menyimpan konten: " + (err.message || String(err)));
+    } finally {
+      setIsSubmittingForm(false);
     }
-
-    setIsFormOpen(false);
   };
 
   // Trigger Hapus
@@ -456,9 +614,13 @@ export default function KalenderKontenPage() {
   };
 
   // Confirm Hapus
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingItem) return;
-    // TODO: Replace with Supabase delete query
+    try {
+      await deleteKalenderKontenFromSupabase(deletingItem.id);
+    } catch (err) {
+      console.warn("Gagal hapus dari Supabase:", err);
+    }
     setItems((prev) => prev.filter((i) => i.id !== deletingItem.id));
     setDeletingItem(null);
   };
@@ -508,18 +670,106 @@ export default function KalenderKontenPage() {
           </div>
 
           {canManage && (
-            <button
-              onClick={() => handleOpenCreateForm()}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 font-semibold text-sm shadow-md transition cursor-pointer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-              </svg>
-              + Tambah Konten
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSendTodayReminders}
+                disabled={isSendingReminder}
+                title="Kirim notifikasi email pengingat otomatis ke Gmail masing-masing PIC yang punya jadwal konten hari ini"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/80 text-sky-700 dark:text-sky-300 px-3.5 py-2.5 font-semibold text-xs shadow-xs transition cursor-pointer disabled:opacity-50"
+              >
+                {isSendingReminder ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Mengirim...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✉️</span>
+                    <span>Kirim Pengingat Hari Ini</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => handleOpenCreateForm()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 font-semibold text-sm shadow-md transition cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                + Tambah Konten
+              </button>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Alert Feedback Hasil Kirim Pengingat Hari Ini */}
+      {reminderResult && (
+        <div
+          className={`rounded-xl p-4 border text-xs transition relative flex items-start justify-between gap-3 ${
+            (reminderResult.totalContentsFound === 0 || reminderResult.totalItems === 0)
+              ? "bg-sky-50 border-sky-200 text-sky-900 dark:bg-sky-950/40 dark:border-sky-900 dark:text-sky-200"
+              : reminderResult.success
+              ? "bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-200"
+              : "bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-200"
+          }`}
+        >
+          <div className="space-y-1">
+            <div className="font-bold flex items-center gap-1.5">
+              <span>
+                {(reminderResult.totalContentsFound === 0 || reminderResult.totalItems === 0)
+                  ? "ℹ️"
+                  : reminderResult.success
+                  ? "✅"
+                  : "⚠️"}
+              </span>
+              <span>
+                {(reminderResult.totalContentsFound === 0 || reminderResult.totalItems === 0)
+                  ? "Informasi Jadwal Konten"
+                  : reminderResult.success
+                  ? "Pengiriman Pengingat Selesai"
+                  : "Pengiriman Gagal"}
+              </span>
+            </div>
+            <p className="opacity-90">
+              {reminderResult.success === false
+                ? (reminderResult.message || reminderResult.error || "Terjadi kendala saat mengirim email pengingat.")
+                : (reminderResult.totalContentsFound === 0 || reminderResult.totalItems === 0)
+                ? (reminderResult.message || `Tidak ada jadwal konten aktif (draft/siap/terjadwal) yang jatuh tempo hari ini (${reminderResult.targetDate || "hari ini"}). Tidak ada email yang perlu dikirim.`)
+                : reminderResult.message ||
+                  `Berhasil mengirim ${reminderResult.emailsSent || 0} email dari ${
+                    reminderResult.totalPicsInvolved || 0
+                  } PIC untuk ${reminderResult.totalContentsFound || 0} konten jadwal hari ini (${
+                    reminderResult.targetDate || "-"
+                  }).`}
+            </p>
+            {reminderResult.details && reminderResult.details.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {reminderResult.details.map((d: any, idx: number) => (
+                  <div key={idx} className="flex items-center gap-2 text-[11px]">
+                    <span className={d.success ? "text-emerald-700 font-bold dark:text-emerald-400" : "text-rose-600 font-bold dark:text-rose-400"}>
+                      {d.success ? "✓" : "✗"}
+                    </span>
+                    <span className="font-semibold">{d.nama}</span>
+                    <span className="opacity-75">({d.email})</span>:
+                    <span className="italic">{d.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setReminderResult(null)}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm font-bold cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Top Highlight Banner Ringkas Pengingat Konten 1 Minggu Terdekat */}
       {items.length > 0 && (
@@ -686,8 +936,7 @@ export default function KalenderKontenPage() {
               }
 
               const dateItems = cell.dateStr ? itemsByDate[cell.dateStr] || [] : [];
-              const isToday =
-                cell.dateStr === new Date().toISOString().split("T")[0];
+              const isToday = cell.dateStr === getTodayWIB();
 
               return (
                 <div
@@ -812,8 +1061,17 @@ export default function KalenderKontenPage() {
                           {getPlatformLabel(item.platform)}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        {getPicName(item.pic)}
+                      <td className="py-3.5 px-4 text-xs font-medium text-gray-700 dark:text-gray-300">
+                        <div className="flex flex-wrap gap-1">
+                          {getPicNames(item.pic, availableUsers).map((picName, pIdx) => (
+                            <span
+                              key={pIdx}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-[11px] font-medium"
+                            >
+                              👤 {picName}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span
@@ -899,10 +1157,17 @@ export default function KalenderKontenPage() {
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-400 block font-medium">Penanggung Jawab (PIC)</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">
-                    👤 {getPicName(selectedItem.pic)}
-                  </span>
+                  <span className="text-gray-400 block font-medium mb-1">Penanggung Jawab (PIC)</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {getPicNames(selectedItem.pic, availableUsers).map((picName, pIdx) => (
+                      <span
+                        key={pIdx}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold text-xs border border-gray-200 dark:border-gray-600"
+                      >
+                        👤 {picName}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -1119,20 +1384,51 @@ export default function KalenderKontenPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Penanggung Jawab (PIC) *
-                </label>
-                <select
-                  value={formData.pic}
-                  onChange={(e) => setFormData({ ...formData, pic: e.target.value })}
-                  className="w-full p-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500/20"
-                >
-                  {mockUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nama} ({u.role})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Penanggung Jawab (PIC) * (Bisa pilih lebih dari 1 orang)
+                  </label>
+                  <span className="text-[11px] font-semibold text-brand-600 dark:text-brand-400">
+                    {formData.pic.length} PIC Terpilih
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 max-h-48 overflow-y-auto">
+                  {availableUsers.length === 0 ? (
+                    <div className="col-span-2 text-center py-4 text-xs text-gray-500 dark:text-gray-400">
+                      {isLoading ? "Memuat data pengguna..." : "Belum ada data pengguna aktif di database."}
+                    </div>
+                  ) : (
+                    availableUsers.map((u) => {
+                      const isChecked = formData.pic.includes(u.id);
+                      return (
+                        <label
+                          key={u.id}
+                          className={`flex items-center gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition ${
+                            isChecked
+                              ? "bg-brand-50 border-brand-300 text-brand-900 dark:bg-brand-950/40 dark:border-brand-800 dark:text-brand-200 font-semibold shadow-2xs"
+                              : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handlePicCheckboxToggle(u.id)}
+                            className="rounded text-brand-500 focus:ring-brand-500/20"
+                          />
+                          <div className="truncate">
+                            <div className="truncate">{u.nama}</div>
+                            <div className="text-[10px] opacity-70 truncate font-normal">
+                              {u.role} • {u.email}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                  * Email notifikasi pengingat otomatis akan dikirim ke seluruh PIC yang terpilih pada hari-H jadwal konten.
+                </p>
               </div>
 
               {/* Note Informasi Pembuatan Folder Drive Bahan Otomatis */}
@@ -1184,9 +1480,20 @@ export default function KalenderKontenPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow transition cursor-pointer"
+                  disabled={isSubmittingForm}
+                  className="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow transition cursor-pointer disabled:opacity-60 inline-flex items-center gap-2"
                 >
-                  {editingItem ? "Simpan Perubahan" : "Tambah Konten"}
+                  {isSubmittingForm && (
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  {isSubmittingForm
+                    ? "Menyimpan & Membuat Folder..."
+                    : editingItem
+                    ? "Simpan Perubahan"
+                    : "Tambah Konten"}
                 </button>
               </div>
             </form>

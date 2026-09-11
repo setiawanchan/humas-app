@@ -4,7 +4,7 @@ import Link from "next/link";
 import React, { useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
-import { mockContentCalendar, mockUsers, ContentCalendarItem } from "@/lib/mock-data";
+import { mockContentCalendar, mockUsers, ContentCalendarItem, parsePicIds } from "@/lib/mock-data";
 
 export default function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -29,9 +29,14 @@ export default function NotificationDropdown() {
     .sort((a, b) => a.tanggal.localeCompare(b.tanggal))
     .slice(0, 5);
 
-  const getPicName = (picId: string) => {
-    const user = mockUsers.find((u) => u.id === picId);
-    return user ? user.nama : picId;
+  const getPicName = (pic: string | string[] | undefined) => {
+    const ids = parsePicIds(pic);
+    if (ids.length === 0) return "-";
+    const names = ids.map((id) => {
+      const user = mockUsers.find((u) => u.id === id);
+      return user ? user.nama : id;
+    });
+    return names.join(", ");
   };
 
   const getStatusBadge = (status: ContentCalendarItem["status"]) => {

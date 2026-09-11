@@ -387,12 +387,25 @@ export default function Dokse2026Page() {
       // 5. Text Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchNama = item.nama_sls.toLowerCase().includes(q);
-        const matchDesa = item.nama_desa.toLowerCase().includes(q);
-        const matchKec = item.nama_kec.toLowerCase().includes(q);
-        const matchId = item.idsubsls.toLowerCase().includes(q);
-        const matchKet = item.keterangan.toLowerCase().includes(q);
-        if (!matchNama && !matchDesa && !matchKec && !matchId && !matchKet) return false;
+        const matchNama = (item.nama_sls || "").toLowerCase().includes(q);
+        const matchDesa = (item.nama_desa || "").toLowerCase().includes(q);
+        const matchKec = (item.nama_kec || "").toLowerCase().includes(q);
+        const matchId = (item.idsubsls || "").toLowerCase().includes(q);
+        const matchKet = (item.keterangan || "").toLowerCase().includes(q);
+        const matchJenis = (item.jenis || "").toLowerCase().includes(q);
+        const matchKodeSls = (item.kode_sls || "").toLowerCase().includes(q);
+        const matchKodeSubsls = (item.kode_subsls || "").toLowerCase().includes(q);
+        if (
+          !matchNama &&
+          !matchDesa &&
+          !matchKec &&
+          !matchId &&
+          !matchKet &&
+          !matchJenis &&
+          !matchKodeSls &&
+          !matchKodeSubsls
+        )
+          return false;
       }
 
       return true;
@@ -413,6 +426,34 @@ export default function Dokse2026Page() {
     const start = (currentPage - 1) * itemsPerPage;
     return filteredData.slice(start, start + itemsPerPage);
   }, [filteredData, currentPage, itemsPerPage]);
+
+  // Helper Halaman Pagination Ringkas dengan Elipsis (...)
+  const paginationPages = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const pages: (number | string)[] = [];
+    pages.push(1);
+
+    if (currentPage > 3) {
+      pages.push("...");
+    }
+
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    if (currentPage < totalPages - 2) {
+      pages.push("...");
+    }
+
+    pages.push(totalPages);
+    return pages;
+  }, [totalPages, currentPage]);
 
   // Handler Update Kolom Pengecekan
   // CATATAN KHUSUS: Jika Peta Desa diubah, maka seluruh SLS dalam desa yang sama otomatis ikut berubah!
@@ -480,9 +521,14 @@ export default function Dokse2026Page() {
   const handleExportExcel = () => {
     const headers = [
       "ID SubSLS",
-      "Kecamatan",
-      "Desa/Kelurahan",
-      "Nama SLS / SubSLS",
+      "Nama SLS",
+      "Jenis",
+      "Kode Kecamatan",
+      "Nama Kecamatan",
+      "Kode Desa",
+      "Nama Desa",
+      "Kode SLS",
+      "Kode SubSLS",
       "Peta Desa",
       "Peta Sub-RT",
       "Dokumen PSLS",
@@ -493,17 +539,22 @@ export default function Dokse2026Page() {
     ];
 
     const rows = filteredData.map((item) => [
-      `"${item.idsubsls}"`,
-      `"${item.nama_kec}"`,
-      `"${item.nama_desa}"`,
-      `"${item.nama_sls}"`,
-      `"${item.peta_desa}"`,
-      `"${item.peta_subrt}"`,
-      `"${item.dokumen_psls}"`,
-      `"${item.peta_terisi}"`,
-      `"${item.perubahan_batas}"`,
+      `"${item.idsubsls || ""}"`,
+      `"${item.nama_sls || ""}"`,
+      `"${item.jenis || ""}"`,
+      `"${item.kode_kec || ""}"`,
+      `"${item.nama_kec || ""}"`,
+      `"${item.kode_desa || ""}"`,
+      `"${item.nama_desa || ""}"`,
+      `"${item.kode_sls || ""}"`,
+      `"${item.kode_subsls || ""}"`,
+      `"${item.peta_desa || ""}"`,
+      `"${item.peta_subrt || ""}"`,
+      `"${item.dokumen_psls || ""}"`,
+      `"${item.peta_terisi || ""}"`,
+      `"${item.perubahan_batas || ""}"`,
       `"${getStatusPenerimaan(item)}"`,
-      `"${item.keterangan.replace(/"/g, '""')}"`,
+      `"${(item.keterangan || "").replace(/"/g, '""')}"`,
     ]);
 
     const csvContent =
@@ -525,18 +576,21 @@ export default function Dokse2026Page() {
   const handleDownloadTemplate = () => {
     const templateData = [
       {
-        idsubsls: "360201000100100",
-        kode_kec: "010",
-        nama_kec: "Malingping",
-        kode_desa: "001",
-        nama_desa: "Malingping Utara",
-        nama_sls: "RT 001 / RW 001",
-        peta_desa: "Ada",
-        peta_subrt: "Ada",
-        dokumen_psls: "Ada",
-        peta_terisi: "Ya",
-        perubahan_batas: "Tidak",
-        keterangan: "Contoh catatan kelengkapan",
+        "ID SubSLS": "360201000100100",
+        "Nama SLS": "RT 001 / RW 001",
+        "Jenis": "SLS",
+        "Kode Kecamatan": "010",
+        "Nama Kecamatan": "Malingping",
+        "Kode Desa": "001",
+        "Nama Desa": "Malingping Utara",
+        "Kode SLS": "001",
+        "Kode SubSLS": "00",
+        "Peta Desa": "Ada",
+        "Peta Sub-RT": "Ada",
+        "Dokumen PSLS": "Ada",
+        "Peta Terisi": "Ya",
+        "Perubahan Batas": "Tidak",
+        "Keterangan": "Contoh catatan kelengkapan",
       },
     ];
 
@@ -557,7 +611,24 @@ export default function Dokse2026Page() {
 
       // Try parsing JSON first
       if (importText.trim().startsWith("[")) {
-        itemsToInsert = JSON.parse(importText);
+        const rawJson = JSON.parse(importText);
+        itemsToInsert = rawJson.map((row: any, i: number) => ({
+          idsubsls: String(row.idsubsls || row["id subsls"] || row["ID SubSLS"] || `sls_${Date.now()}_${i}`),
+          nama_sls: String(row.nama_sls || row["nama sls"] || row["Nama SLS"] || row.sls || "SLS"),
+          jenis: String(row.jenis || row["Jenis"] || ""),
+          kode_kec: String(row.kode_kec || row["kode kec"] || row["Kode Kecamatan"] || row["kode kecamatan"] || row.kecamatan?.substring(0, 3) || "010"),
+          nama_kec: String(row.nama_kec || row["nama kec"] || row["Nama Kecamatan"] || row["nama kecamatan"] || row.kecamatan || "Kecamatan"),
+          kode_desa: String(row.kode_desa || row["kode desa"] || row["Kode Desa"] || row["kode desa"] || row.desa?.substring(0, 3) || "001"),
+          nama_desa: String(row.nama_desa || row["nama desa"] || row["Nama Desa"] || row["nama desa"] || row.desa || "Desa"),
+          kode_sls: String(row.kode_sls || row["kode sls"] || row["Kode SLS"] || ""),
+          kode_subsls: String(row.kode_subsls || row["kode subsls"] || row["Kode SubSLS"] || ""),
+          peta_desa: (row.peta_desa || row["peta desa"] || row["Peta Desa"] || "Ada") as "Ada" | "Tidak" | "-",
+          peta_subrt: (row.peta_subrt || row["peta subrt"] || row["Peta Sub-RT"] || row["Peta SubRT"] || "Ada") as "Ada" | "Tidak" | "-",
+          dokumen_psls: (row.dokumen_psls || row["dokumen psls"] || row["Dokumen PSLS"] || "Ada") as "Ada" | "Tidak" | "-",
+          peta_terisi: (row.peta_terisi || row["peta terisi"] || row["Peta Terisi"] || "Ya") as "Ya" | "Tidak" | "-",
+          perubahan_batas: (row.perubahan_batas || row["perubahan batas"] || row["Perubahan Batas"] || "Tidak") as "Ada" | "Tidak" | "-",
+          keterangan: String(row.keterangan || row["keterangan"] || row["Keterangan"] || ""),
+        }));
       } else {
         // Parse CSV or Tab-Separated Values (Copy Paste dari Excel)
         const lines = importText.trim().split(/\r?\n/);
@@ -571,19 +642,22 @@ export default function Dokse2026Page() {
             row[h] = cols[idx] || "";
           });
 
-          if (row.idsubsls || row["id subsls"]) {
+          if (row.idsubsls || row["id subsls"] || row["id_subsls"]) {
             itemsToInsert.push({
-              idsubsls: row.idsubsls || row["id subsls"] || `sls_${Date.now()}_${i}`,
-              kode_kec: row.kode_kec || row["kode kec"] || row.kecamatan?.substring(0, 3) || "010",
-              nama_kec: row.nama_kec || row["nama kec"] || row.kecamatan || "Kecamatan",
-              kode_desa: row.kode_desa || row["kode desa"] || row.desa?.substring(0, 3) || "001",
-              nama_desa: row.nama_desa || row["nama desa"] || row.desa || "Desa",
-              nama_sls: row.nama_sls || row["nama sls"] || row["sls"] || "SLS",
-              peta_desa: (row.peta_desa || row["peta desa"] || "Ada") as "Ada" | "Tidak" | "-",
-              peta_subrt: (row.peta_subrt || row["peta subrt"] || "Ada") as "Ada" | "Tidak" | "-",
-              dokumen_psls: (row.dokumen_psls || row["dokumen psls"] || "Ada") as "Ada" | "Tidak" | "-",
-              peta_terisi: (row.peta_terisi || row["peta terisi"] || "Ya") as "Ya" | "Tidak" | "-",
-              perubahan_batas: (row.perubahan_batas || row["perubahan batas"] || "Tidak") as "Ada" | "Tidak" | "-",
+              idsubsls: row.idsubsls || row["id subsls"] || row["id_subsls"] || `sls_${Date.now()}_${i}`,
+              nama_sls: row.nama_sls || row["nama sls"] || row["nama_sls"] || row["sls"] || "SLS",
+              jenis: row.jenis || "",
+              kode_kec: row.kode_kec || row["kode kec"] || row["kode_kec"] || row["kode kecamatan"] || row.kecamatan?.substring(0, 3) || "010",
+              nama_kec: row.nama_kec || row["nama kec"] || row["nama_kec"] || row["nama kecamatan"] || row.kecamatan || "Kecamatan",
+              kode_desa: row.kode_desa || row["kode desa"] || row["kode_desa"] || row["kode desa/kelurahan"] || row.desa?.substring(0, 3) || "001",
+              nama_desa: row.nama_desa || row["nama desa"] || row["nama_desa"] || row["nama desa/kelurahan"] || row.desa || "Desa",
+              kode_sls: row.kode_sls || row["kode sls"] || row["kode_sls"] || "",
+              kode_subsls: row.kode_subsls || row["kode subsls"] || row["kode_subsls"] || "",
+              peta_desa: (row.peta_desa || row["peta desa"] || row["peta_desa"] || "Ada") as "Ada" | "Tidak" | "-",
+              peta_subrt: (row.peta_subrt || row["peta subrt"] || row["peta_subrt"] || row["peta sub-rt"] || "Ada") as "Ada" | "Tidak" | "-",
+              dokumen_psls: (row.dokumen_psls || row["dokumen psls"] || row["dokumen_psls"] || "Ada") as "Ada" | "Tidak" | "-",
+              peta_terisi: (row.peta_terisi || row["peta terisi"] || row["peta_terisi"] || "Ya") as "Ya" | "Tidak" | "-",
+              perubahan_batas: (row.perubahan_batas || row["perubahan batas"] || row["perubahan_batas"] || "Tidak") as "Ada" | "Tidak" | "-",
               keterangan: row.keterangan || "",
             });
           }
@@ -846,14 +920,19 @@ export default function Dokse2026Page() {
         {/* Full Data Table */}
         <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1200px]">
+            <table className="w-full text-left border-collapse min-w-[1400px]">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-700/50 text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider select-none">
                   <th className="py-3 px-3 w-10 text-center">No</th>
                   <th className="py-3 px-3 w-36">ID SubSLS</th>
+                  <th className="py-3 px-3 min-w-[180px]">Nama SLS</th>
+                  <th className="py-3 px-3 w-20">Jenis</th>
+                  <th className="py-3 px-3 w-24">Kd Kec</th>
                   <th className="py-3 px-3 w-32">Kecamatan</th>
+                  <th className="py-3 px-3 w-24">Kd Desa</th>
                   <th className="py-3 px-3 w-36">Desa / Kelurahan</th>
-                  <th className="py-3 px-3 min-w-[200px]">Nama SLS / SubSLS</th>
+                  <th className="py-3 px-3 w-20">Kd SLS</th>
+                  <th className="py-3 px-3 w-24">Kd SubSLS</th>
                   <th className="py-3 px-3 w-28 text-center bg-orange-50/50 dark:bg-orange-950/20 text-orange-800 dark:text-orange-300">Peta Desa</th>
                   <th className="py-3 px-3 w-28 text-center">Peta Sub-RT</th>
                   <th className="py-3 px-3 w-28 text-center">Dokumen PSLS</th>
@@ -866,7 +945,7 @@ export default function Dokse2026Page() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 text-xs">
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="p-8 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={17} className="p-8 text-center text-gray-500 dark:text-gray-400">
                       Tidak ada data pengecekan Dokse 2026 yang sesuai dengan filter.
                     </td>
                   </tr>
@@ -889,9 +968,31 @@ export default function Dokse2026Page() {
                           {item.idsubsls}
                         </td>
 
+                        {/* Nama SLS */}
+                        <td className="py-3 px-3 font-semibold text-gray-900 dark:text-white">
+                          {item.nama_sls}
+                        </td>
+
+                        {/* Jenis */}
+                        <td className="py-3 px-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium text-[11px]">
+                            {item.jenis || "-"}
+                          </span>
+                        </td>
+
+                        {/* Kode Kecamatan */}
+                        <td className="py-3 px-3 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                          {item.kode_kec}
+                        </td>
+
                         {/* Kecamatan */}
                         <td className="py-3 px-3 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {item.nama_kec}
+                        </td>
+
+                        {/* Kode Desa */}
+                        <td className="py-3 px-3 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                          {item.kode_desa}
                         </td>
 
                         {/* Desa */}
@@ -899,9 +1000,14 @@ export default function Dokse2026Page() {
                           {item.nama_desa}
                         </td>
 
-                        {/* Nama SLS */}
-                        <td className="py-3 px-3 font-semibold text-gray-900 dark:text-white">
-                          {item.nama_sls}
+                        {/* Kode SLS */}
+                        <td className="py-3 px-3 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                          {item.kode_sls || "-"}
+                        </td>
+
+                        {/* Kode SubSLS */}
+                        <td className="py-3 px-3 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                          {item.kode_subsls || "-"}
                         </td>
 
                         {/* Peta Desa (Sinkron per Desa) */}
@@ -1077,51 +1183,87 @@ export default function Dokse2026Page() {
                   setItemsPerPage(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="py-1 px-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-semibold text-gray-900 dark:text-white focus:outline-none"
+                className="py-1 px-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xs font-semibold text-gray-900 dark:text-white focus:outline-none cursor-pointer"
               >
-                <option value={5}>5</option>
                 <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
               </select>
               <span>baris per halaman</span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap justify-center sm:justify-end">
               <span className="text-gray-500 dark:text-gray-400 mr-2">
-                Halaman <strong className="text-gray-900 dark:text-white">{currentPage}</strong> dari <strong className="text-gray-900 dark:text-white">{totalPages}</strong>
+                Halaman <strong className="text-gray-900 dark:text-white">{currentPage}</strong> dari{" "}
+                <strong className="text-gray-900 dark:text-white">{totalPages}</strong>
               </span>
 
+              {/* Tombol Pertama (<<) */}
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                title="Halaman Pertama"
+                className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold text-xs flex items-center justify-center cursor-pointer"
+              >
+                «
+              </button>
+
+              {/* Tombol Sebelumnya (<) */}
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium cursor-pointer"
+                title="Halaman Sebelumnya"
+                className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold text-xs flex items-center justify-center cursor-pointer"
               >
-                ← Prev
+                ‹
               </button>
 
+              {/* Angka Halaman Ringkas dengan Elipsis (...) */}
               <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                      currentPage === pageNum
-                        ? "bg-brand-500 text-white shadow-sm"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
+                {paginationPages.map((page, idx) =>
+                  page === "..." ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="w-6 text-center text-xs font-bold text-gray-400 select-none"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(Number(page))}
+                      className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                        currentPage === page
+                          ? "bg-brand-500 text-white shadow-sm font-bold"
+                          : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
               </div>
 
+              {/* Tombol Berikutnya (>) */}
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium cursor-pointer"
+                title="Halaman Berikutnya"
+                className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold text-xs flex items-center justify-center cursor-pointer"
               >
-                Next →
+                ›
+              </button>
+
+              {/* Tombol Terakhir (>>) */}
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                title="Halaman Terakhir"
+                className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition font-bold text-xs flex items-center justify-center cursor-pointer"
+              >
+                »
               </button>
             </div>
           </div>
@@ -1344,11 +1486,11 @@ export default function Dokse2026Page() {
           onClose={() => setIsDashboardModalOpen(false)}
           showCloseButton={true}
           isFullscreen={true}
-          className="p-4 md:p-6 bg-gray-50 dark:bg-gray-900"
+          className="p-3 sm:p-5 md:p-6 bg-white dark:bg-gray-900 min-h-screen text-gray-900 dark:text-white"
         >
-          <div className="max-w-[1600px] mx-auto space-y-5 h-full flex flex-col justify-between">
+          <div className="max-w-[1600px] mx-auto space-y-4 sm:space-y-5 h-full flex flex-col justify-between">
             {/* Header Dialog Dashboard */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 pr-12 sm:pr-16">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-brand-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">
                   📊
@@ -1518,183 +1660,347 @@ export default function Dokse2026Page() {
 
                 {/* Content Table Container Full Height */}
                 <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs">
-                  {/* LEVEL 1: TABEL KECAMATAN (Klik Baris untuk Buka Popup / Detail Desa) */}
+                  {/* LEVEL 1: TABEL KECAMATAN (Klik Baris untuk Buka Detail Desa) */}
                   {dashSelectedKec === "all" && (
-                    <div>
-                      <div className="bg-gray-50 dark:bg-gray-700/60 p-3 border-b border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center justify-between">
-                        <span>Daftar Seluruh Kecamatan BPS Kabupaten Lebak</span>
-                        <span className="text-brand-600 dark:text-brand-400 font-semibold">*Klik baris kecamatan untuk melihat daftar desa</span>
+                    <div className="p-2 sm:p-3 space-y-2.5">
+                      <div className="bg-gray-50 dark:bg-gray-700/60 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                        <span>🏛️ Rekapitulasi Seluruh 28 Kecamatan (BPS Kab. Lebak)</span>
+                        <span className="text-brand-600 dark:text-brand-400 font-semibold text-[11px] hidden sm:inline">*Klik kecamatan untuk rincian desa</span>
                       </div>
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[11px]">
-                            <th className="py-3 px-4 w-24">Kode</th>
-                            <th className="py-3 px-4 min-w-[220px]">Nama Kecamatan</th>
-                            <th className="py-3 px-4 text-center w-28">Total SLS</th>
-                            <th className="py-3 px-4 text-center w-28 text-emerald-600">Lengkap</th>
-                            <th className="py-3 px-4 text-center w-28 text-rose-600">Tidak Lengkap</th>
-                            <th className="py-3 px-4 text-center w-48">Progres Capaian</th>
-                            <th className="py-3 px-4 text-center w-28">Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                          {kecProgressList.map((k) => {
-                            const pct = Math.round((k.lengkap / (k.total || 1)) * 100);
-                            return (
-                              <tr
-                                key={k.kode}
-                                onClick={() => {
-                                  setDashSelectedKec(k.kode);
-                                  setDashSelectedDesa("all");
-                                }}
-                                className="hover:bg-brand-50/70 dark:hover:bg-brand-950/40 cursor-pointer transition"
-                              >
-                                <td className="py-3 px-4 font-mono font-bold text-brand-600">{k.kode}</td>
-                                <td className="py-3 px-4 font-bold text-gray-900 dark:text-white text-sm">{k.nama}</td>
-                                <td className="py-3 px-4 text-center font-bold text-gray-700 dark:text-gray-300">{k.total}</td>
-                                <td className="py-3 px-4 text-center font-bold text-emerald-600">{k.lengkap}</td>
-                                <td className="py-3 px-4 text-center font-bold text-rose-600">{k.tidakLengkap}</td>
-                                <td className="py-3 px-4 text-center">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <div className="w-28 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                                      <div
-                                        className={`h-2.5 rounded-full transition-all ${
-                                          pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
-                                        }`}
-                                        style={{ width: `${pct}%` }}
-                                      />
-                                    </div>
-                                    <span className="font-extrabold text-xs text-gray-900 dark:text-white w-9 text-right">{pct}%</span>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  <span className="px-2.5 py-1 rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-400 font-bold text-[11px] hover:underline">
-                                    Lihat Desa ➔
+
+                      {/* Desktop View: 2 Kolom Berdampingan (14 kiri, 14 kanan) - 1 Layar Penuh Tanpa Scroll */}
+                      <div className="hidden lg:grid lg:grid-cols-2 gap-3">
+                        {[
+                          kecProgressList.slice(0, Math.ceil(kecProgressList.length / 2)),
+                          kecProgressList.slice(Math.ceil(kecProgressList.length / 2)),
+                        ].map((group, groupIdx) => (
+                          <div key={groupIdx} className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[10px]">
+                                  <th className="py-1.5 px-2.5 w-12 text-center">Kd</th>
+                                  <th className="py-1.5 px-2.5">Kecamatan</th>
+                                  <th className="py-1.5 px-2 text-center w-14">SLS</th>
+                                  <th className="py-1.5 px-2 text-center w-24 text-emerald-600">L / TL</th>
+                                  <th className="py-1.5 px-2 text-center w-36">Progres</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-[11px]">
+                                {group.map((k) => {
+                                  const pct = Math.round((k.lengkap / (k.total || 1)) * 100);
+                                  return (
+                                    <tr
+                                      key={k.kode}
+                                      onClick={() => {
+                                        setDashSelectedKec(k.kode);
+                                        setDashSelectedDesa("all");
+                                      }}
+                                      className="hover:bg-brand-50/70 dark:hover:bg-brand-950/40 cursor-pointer transition select-none"
+                                    >
+                                      <td className="py-1.5 px-2.5 text-center font-mono font-bold text-brand-600 text-[11px]">{k.kode}</td>
+                                      <td className="py-1.5 px-2.5 font-bold text-gray-900 dark:text-white truncate max-w-[150px]">{k.nama}</td>
+                                      <td className="py-1.5 px-2 text-center font-semibold text-gray-600 dark:text-gray-400">{k.total}</td>
+                                      <td className="py-1.5 px-2 text-center font-bold">
+                                        <span className="text-emerald-600">{k.lengkap}</span>
+                                        <span className="text-gray-400 mx-1">/</span>
+                                        <span className="text-rose-500">{k.tidakLengkap}</span>
+                                      </td>
+                                      <td className="py-1.5 px-2 text-center">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div
+                                              className={`h-2 rounded-full transition-all ${
+                                                pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                              }`}
+                                              style={{ width: `${pct}%` }}
+                                            />
+                                          </div>
+                                          <span className="font-extrabold text-[11px] text-gray-900 dark:text-white w-8 text-right">{pct}%</span>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Mobile & Tablet View: Kartu Minimalis Ramping */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-2">
+                        {kecProgressList.map((k) => {
+                          const pct = Math.round((k.lengkap / (k.total || 1)) * 100);
+                          return (
+                            <div
+                              key={k.kode}
+                              onClick={() => {
+                                setDashSelectedKec(k.kode);
+                                setDashSelectedDesa("all");
+                              }}
+                              className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-brand-500 cursor-pointer shadow-xs transition"
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-400">
+                                    {k.kode}
                                   </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                  <h4 className="font-bold text-xs text-gray-900 dark:text-white">{k.nama}</h4>
+                                </div>
+                                <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                                  pct === 100
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : pct >= 50
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                    : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                }`}>
+                                  {pct}%
+                                </span>
+                              </div>
+
+                              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden mb-2">
+                                <div
+                                  className={`h-2 rounded-full transition-all ${
+                                    pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                  }`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                                <span>Total: <strong>{k.total}</strong> SLS</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-emerald-600 font-semibold">✓ {k.lengkap}</span>
+                                  <span className="text-rose-500 font-semibold">✗ {k.tidakLengkap}</span>
+                                </div>
+                                <span className="text-brand-600 dark:text-brand-400 font-bold text-[10px]">Lihat Desa ➔</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
                   {/* LEVEL 2: TABEL DESA / KELURAHAN (Klik Baris untuk Buka SLS) */}
                   {dashSelectedKec !== "all" && dashSelectedDesa === "all" && (
-                    <div>
-                      <div className="bg-brand-50 dark:bg-brand-950/40 p-3 border-b border-brand-100 dark:border-brand-900 text-xs font-bold text-brand-700 dark:text-brand-300 flex items-center justify-between">
-                        <span>📍 Rekapitulasi Seluruh Desa pada Kecamatan {kecProgressList.find((k) => k.kode === dashSelectedKec)?.nama}</span>
-                        <span className="font-semibold">*Klik baris desa untuk merinci status tiap SLS</span>
+                    <div className="p-2 sm:p-3 space-y-2.5">
+                      <div className="bg-brand-50 dark:bg-brand-950/40 p-2.5 rounded-xl border border-brand-100 dark:border-brand-900 text-xs font-bold text-brand-700 dark:text-brand-300 flex items-center justify-between">
+                        <span>📍 Rekapitulasi Desa ({desaProgressList.length}) - Kec. {kecProgressList.find((k) => k.kode === dashSelectedKec)?.nama}</span>
+                        <span className="font-semibold text-[11px] hidden sm:inline">*Klik baris desa untuk merinci tiap SLS</span>
                       </div>
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[11px]">
-                            <th className="py-3 px-4 w-24">Kode</th>
-                            <th className="py-3 px-4 min-w-[220px]">Nama Desa / Kelurahan</th>
-                            <th className="py-3 px-4 text-center w-28">Total SLS</th>
-                            <th className="py-3 px-4 text-center w-28 text-emerald-600">Lengkap</th>
-                            <th className="py-3 px-4 text-center w-28 text-rose-600">Tidak Lengkap</th>
-                            <th className="py-3 px-4 text-center w-48">Progres Capaian</th>
-                            <th className="py-3 px-4 text-center w-28">Aksi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                          {desaProgressList.map((d) => {
-                            const pct = Math.round((d.lengkap / (d.total || 1)) * 100);
-                            return (
-                              <tr
-                                key={d.kode}
-                                onClick={() => setDashSelectedDesa(d.kode)}
-                                className="hover:bg-purple-50/70 dark:hover:bg-purple-950/40 cursor-pointer transition"
-                              >
-                                <td className="py-3 px-4 font-mono font-bold text-purple-600">{d.kode}</td>
-                                <td className="py-3 px-4 font-bold text-gray-900 dark:text-white text-sm">{d.nama}</td>
-                                <td className="py-3 px-4 text-center font-bold text-gray-700 dark:text-gray-300">{d.total}</td>
-                                <td className="py-3 px-4 text-center font-bold text-emerald-600">{d.lengkap}</td>
-                                <td className="py-3 px-4 text-center font-bold text-rose-600">{d.tidakLengkap}</td>
-                                <td className="py-3 px-4 text-center">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <div className="w-28 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                                      <div
-                                        className={`h-2.5 rounded-full transition-all ${
-                                          pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
-                                        }`}
-                                        style={{ width: `${pct}%` }}
-                                      />
-                                    </div>
-                                    <span className="font-extrabold text-xs text-gray-900 dark:text-white w-9 text-right">{pct}%</span>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  <span className="px-2.5 py-1 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400 font-bold text-[11px] hover:underline">
-                                    Detail SLS ➔
+
+                      {/* Desktop View: 2 Kolom Berdampingan jika > 8 desa */}
+                      <div className={desaProgressList.length > 8 ? "hidden lg:grid lg:grid-cols-2 gap-3" : "hidden lg:block"}>
+                        {(desaProgressList.length > 8
+                          ? [
+                              desaProgressList.slice(0, Math.ceil(desaProgressList.length / 2)),
+                              desaProgressList.slice(Math.ceil(desaProgressList.length / 2)),
+                            ]
+                          : [desaProgressList]
+                        ).map((group, groupIdx) => (
+                          <div key={groupIdx} className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[10px]">
+                                  <th className="py-1.5 px-2.5 w-12 text-center">Kd</th>
+                                  <th className="py-1.5 px-2.5">Desa / Kelurahan</th>
+                                  <th className="py-1.5 px-2 text-center w-14">SLS</th>
+                                  <th className="py-1.5 px-2 text-center w-24 text-emerald-600">L / TL</th>
+                                  <th className="py-1.5 px-2 text-center w-36">Progres</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-[11px]">
+                                {group.map((d) => {
+                                  const pct = Math.round((d.lengkap / (d.total || 1)) * 100);
+                                  return (
+                                    <tr
+                                      key={d.kode}
+                                      onClick={() => setDashSelectedDesa(d.kode)}
+                                      className="hover:bg-purple-50/70 dark:hover:bg-purple-950/40 cursor-pointer transition select-none"
+                                    >
+                                      <td className="py-1.5 px-2.5 text-center font-mono font-bold text-purple-600 text-[11px]">{d.kode}</td>
+                                      <td className="py-1.5 px-2.5 font-bold text-gray-900 dark:text-white truncate max-w-[150px]">{d.nama}</td>
+                                      <td className="py-1.5 px-2 text-center font-semibold text-gray-600 dark:text-gray-400">{d.total}</td>
+                                      <td className="py-1.5 px-2 text-center font-bold">
+                                        <span className="text-emerald-600">{d.lengkap}</span>
+                                        <span className="text-gray-400 mx-1">/</span>
+                                        <span className="text-rose-500">{d.tidakLengkap}</span>
+                                      </td>
+                                      <td className="py-1.5 px-2 text-center">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div
+                                              className={`h-2 rounded-full transition-all ${
+                                                pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                              }`}
+                                              style={{ width: `${pct}%` }}
+                                            />
+                                          </div>
+                                          <span className="font-extrabold text-[11px] text-gray-900 dark:text-white w-8 text-right">{pct}%</span>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Mobile View: Kartu Minimalis Ramping */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-2">
+                        {desaProgressList.map((d) => {
+                          const pct = Math.round((d.lengkap / (d.total || 1)) * 100);
+                          return (
+                            <div
+                              key={d.kode}
+                              onClick={() => setDashSelectedDesa(d.kode)}
+                              className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-purple-500 cursor-pointer shadow-xs transition"
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
+                                    {d.kode}
                                   </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                  <h4 className="font-bold text-xs text-gray-900 dark:text-white">{d.nama}</h4>
+                                </div>
+                                <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                                  pct === 100
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : pct >= 50
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                    : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                }`}>
+                                  {pct}%
+                                </span>
+                              </div>
+
+                              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden mb-2">
+                                <div
+                                  className={`h-2 rounded-full transition-all ${
+                                    pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                  }`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                                <span>Total: <strong>{d.total}</strong> SLS</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-emerald-600 font-semibold">✓ {d.lengkap}</span>
+                                  <span className="text-rose-500 font-semibold">✗ {d.tidakLengkap}</span>
+                                </div>
+                                <span className="text-purple-600 dark:text-purple-400 font-bold text-[10px]">Rincian SLS ➔</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
                   {/* LEVEL 3: TABEL RINCIAN DETAIL SLS / SUBSLS & KRITERIA YANG BELUM LENGKAP */}
                   {dashSelectedKec !== "all" && dashSelectedDesa !== "all" && (
-                    <div>
-                      <div className="bg-purple-50 dark:bg-purple-950/40 p-3 border-b border-purple-100 dark:border-purple-900 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center justify-between">
+                    <div className="p-2 sm:p-3 space-y-2.5">
+                      <div className="bg-purple-50 dark:bg-purple-950/40 p-2.5 rounded-xl border border-purple-100 dark:border-purple-900 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center justify-between">
                         <span>
                           📍 Rincian Detail SLS pada Desa {desaProgressList.find((d) => d.kode === dashSelectedDesa)?.nama} ({slsProgressList.length} Baris SLS)
                         </span>
-                        <span className="font-normal text-[11px] text-gray-500 dark:text-gray-400">*Menampilkan kriteria komponen yang belum lengkap</span>
+                        <span className="font-normal text-[11px] text-gray-500 dark:text-gray-400 hidden sm:inline">*Menampilkan kriteria komponen yang belum lengkap</span>
                       </div>
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[11px]">
-                            <th className="py-3 px-4 w-40">ID SubSLS</th>
-                            <th className="py-3 px-4 min-w-[200px]">Nama SLS / SubSLS</th>
-                            <th className="py-3 px-4 text-center w-36">Status Kelengkapan</th>
-                            <th className="py-3 px-4 min-w-[300px]">Bagian Komponen Belum Lengkap</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                          {slsProgressList.map((item) => (
-                            <tr key={item.idsubsls} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                              <td className="py-3 px-4 font-mono font-bold text-brand-600 text-xs">{item.idsubsls}</td>
-                              <td className="py-3 px-4 font-bold text-gray-900 dark:text-white text-xs">{item.nama_sls}</td>
-                              <td className="py-3 px-4 text-center">
-                                <span
-                                  className={`px-3 py-1 rounded-full text-xs font-bold inline-block ${
-                                    item.statusPenerimaan === "Lengkap"
-                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300"
-                                      : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-300"
-                                  }`}
-                                >
-                                  {item.statusPenerimaan}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4">
-                                {item.missingParts.length === 0 ? (
-                                  <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
-                                    <span>✓</span> Semua 4 Komponen Utama Lengkap & Terisi
-                                  </span>
-                                ) : (
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    {item.missingParts.map((mp, idx) => (
-                                      <span
-                                        key={idx}
-                                        className="px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[11px] font-semibold"
-                                      >
-                                        ⚠️ Belum Ada: {mp}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </td>
+
+                      {/* Desktop Table View */}
+                      <div className="hidden sm:block rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[10px]">
+                              <th className="py-2 px-3 w-36">ID SubSLS</th>
+                              <th className="py-2 px-3 min-w-[180px]">Nama SLS / SubSLS</th>
+                              <th className="py-2 px-3 text-center w-32">Status</th>
+                              <th className="py-2 px-3 min-w-[260px]">Komponen Belum Lengkap</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-[11px]">
+                            {slsProgressList.map((item) => (
+                              <tr key={item.idsubsls} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                <td className="py-2 px-3 font-mono font-bold text-brand-600 text-xs">{item.idsubsls}</td>
+                                <td className="py-2 px-3 font-bold text-gray-900 dark:text-white text-xs">{item.nama_sls}</td>
+                                <td className="py-2 px-3 text-center">
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold inline-block ${
+                                      item.statusPenerimaan === "Lengkap"
+                                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300"
+                                        : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-300"
+                                    }`}
+                                  >
+                                    {item.statusPenerimaan}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3">
+                                  {item.missingParts.length === 0 ? (
+                                    <span className="text-emerald-600 font-bold text-[11px] flex items-center gap-1">
+                                      <span>✓</span> Lengkap
+                                    </span>
+                                  ) : (
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      {item.missingParts.map((mp, idx) => (
+                                        <span
+                                          key={idx}
+                                          className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[10px] font-semibold"
+                                        >
+                                          ⚠️ {mp}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile View: Kartu SLS */}
+                      <div className="space-y-2 sm:hidden">
+                        {slsProgressList.map((item) => (
+                          <div
+                            key={item.idsubsls}
+                            className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-mono text-[11px] font-bold text-brand-600">{item.idsubsls}</span>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  item.statusPenerimaan === "Lengkap"
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                }`}
+                              >
+                                {item.statusPenerimaan}
+                              </span>
+                            </div>
+                            <div className="font-bold text-xs text-gray-900 dark:text-white mb-2">{item.nama_sls}</div>
+                            {item.missingParts.length === 0 ? (
+                              <div className="text-emerald-600 font-bold text-[11px] flex items-center gap-1">
+                                <span>✓</span> Semua 4 Komponen Utama Lengkap
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {item.missingParts.map((mp, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[10px] font-semibold"
+                                  >
+                                    ⚠️ {mp}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
