@@ -38,6 +38,11 @@ async function handleReminder(request: Request) {
     const host = request.headers.get("host") || "";
     const isInternalRequest = (origin && host && origin.includes(host)) || (referer && host && referer.includes(host));
 
+    // Dapatkan base URL aplikasi: jika dari request gunakan protocol + host, jika tidak fallback ke domain vercel yang terkonfirmasi
+    const detectedBaseUrl = host && !host.includes("localhost") 
+      ? `https://${host}` 
+      : process.env.NEXT_PUBLIC_APP_URL || "https://humas3602.vercel.app";
+
     if (expectedSecret && !isInternalRequest) {
       const authHeader = request.headers.get("authorization");
       const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : null;
@@ -152,8 +157,8 @@ async function handleReminder(request: Request) {
         continue;
       }
 
-      const emailHtml = generateReminderEmailHtml(user.nama, userContents);
-      const emailText = generateReminderEmailText(user.nama, userContents);
+      const emailHtml = generateReminderEmailHtml(user.nama, userContents, detectedBaseUrl);
+      const emailText = generateReminderEmailText(user.nama, userContents, detectedBaseUrl);
       const formattedDate = formatTanggalIndonesia(targetDate);
       const subject = `Jadwal Konten Humas BPS Kabupaten Lebak - ${formattedDate}`;
 

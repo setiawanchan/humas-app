@@ -53,7 +53,14 @@ export function formatTanggalIndonesia(dateStr: string): string {
   return `${dayNum} ${months[monthIdx]} ${yearNum}`;
 }
 
-export function generateReminderEmailHtml(recipientName: string, contents: ReminderContentData[]): string {
+export function generateReminderEmailHtml(
+  recipientName: string,
+  contents: ReminderContentData[],
+  baseUrl?: string
+): string {
+  const appUrl = (baseUrl || process.env.NEXT_PUBLIC_APP_URL || "https://humas3602.vercel.app").replace(/\/$/, "");
+  const calendarUrl = `${appUrl}/kalender-konten`;
+
   const contentItemsHtml = contents
     .map((c) => {
       const formattedDate = formatTanggalIndonesia(c.tanggal);
@@ -140,7 +147,7 @@ export function generateReminderEmailHtml(recipientName: string, contents: Remin
           </p>
 
           <div style="text-align: center; margin: 24px 0 12px 0;">
-            <a href="https://humas-app.vercel.app/kalender-konten" target="_blank" style="display: inline-block; background: #0f172a; color: #ffffff; font-size: 13px; font-weight: 600; padding: 10px 20px; border-radius: 8px; text-decoration: none;">
+            <a href="${calendarUrl}" target="_blank" style="display: inline-block; background: #0f172a; color: #ffffff; font-size: 13px; font-weight: 600; padding: 10px 20px; border-radius: 8px; text-decoration: none;">
               Buka Kalender Konten Humas →
             </a>
           </div>
@@ -156,7 +163,14 @@ export function generateReminderEmailHtml(recipientName: string, contents: Remin
   `;
 }
 
-export function generateReminderEmailText(recipientName: string, contents: ReminderContentData[]): string {
+export function generateReminderEmailText(
+  recipientName: string,
+  contents: ReminderContentData[],
+  baseUrl?: string
+): string {
+  const appUrl = (baseUrl || process.env.NEXT_PUBLIC_APP_URL || "https://humas3602.vercel.app").replace(/\/$/, "");
+  const calendarUrl = `${appUrl}/kalender-konten`;
+
   const contentListText = contents
     .map((c, idx) => {
       const formattedDate = formatTanggalIndonesia(c.tanggal);
@@ -179,7 +193,7 @@ export function generateReminderEmailText(recipientName: string, contents: Remin
     contentListText,
     "",
     "Mohon pastikan bahan konten, desain, dan caption telah siap serta dipublikasikan sesuai jadwal.",
-    "Buka Kalender Konten: https://humas-app.vercel.app/kalender-konten",
+    `Buka Kalender Konten: ${calendarUrl}`,
     "",
     "---",
     "Email resmi dikirim oleh Sistem Informasi Humas BPS Kabupaten Lebak.",
