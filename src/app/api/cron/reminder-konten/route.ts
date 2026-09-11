@@ -3,7 +3,7 @@ import { getKalenderKontenFromSupabase } from "@/lib/supabase/kalender-service";
 import { getUsersFromSupabase } from "@/lib/supabase/user-service";
 import { mockContentCalendar, mockUsers, ContentCalendarItem, User, parsePicIds } from "@/lib/mock-data";
 import { sendGmail } from "@/lib/mail/mailer";
-import { generateReminderEmailHtml, generateReminderEmailText, ReminderContentData } from "@/lib/mail/template";
+import { generateReminderEmailHtml, generateReminderEmailText, formatTanggalIndonesia, ReminderContentData } from "@/lib/mail/template";
 
 // Helper konversi tanggal hari ini WIB (UTC+7 / Asia/Jakarta) ke format YYYY-MM-DD
 function getTodayWIB(): string {
@@ -154,7 +154,8 @@ async function handleReminder(request: Request) {
 
       const emailHtml = generateReminderEmailHtml(user.nama, userContents);
       const emailText = generateReminderEmailText(user.nama, userContents);
-      const subject = `[Pengingat Konten Hari Ini] ${userContents.length} Jadwal Konten BPS Lebak (${targetDate})`;
+      const formattedDate = formatTanggalIndonesia(targetDate);
+      const subject = `Jadwal Konten Humas BPS Kabupaten Lebak - ${formattedDate}`;
 
       const result = await sendGmail({
         to: user.email,
