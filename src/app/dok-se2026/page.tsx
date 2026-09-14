@@ -124,6 +124,27 @@ export default function Dokse2026Page() {
     return "Tidak Lengkap";
   };
 
+  // Helper Styling Warna Badge dan Input Select Pengecekan Dokumen
+  const getDocStatusBadgeClass = (val: string) => {
+    if (val === "Ada" || val === "Ya") {
+      return "text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800";
+    }
+    if (val === "Tidak") {
+      return "text-rose-700 bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800";
+    }
+    return "text-gray-500 dark:text-white bg-gray-100 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700";
+  };
+
+  const getDocStatusSelectClass = (val: string) => {
+    if (val === "Ada" || val === "Ya") {
+      return "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700 font-bold";
+    }
+    if (val === "Tidak") {
+      return "text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-700 font-bold";
+    }
+    return "text-gray-500 dark:text-white bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 font-semibold";
+  };
+
   // Rekapitulasi Statistik Dashboard
   const dashboardStats = useMemo(() => {
     const totalSls = dataList.length;
@@ -1016,20 +1037,14 @@ export default function Dokse2026Page() {
                             <select
                               value={item.peta_desa}
                               onChange={(e) => handleUpdateItem(item.idsubsls, "peta_desa", e.target.value)}
-                              className="py-1 px-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-semibold cursor-pointer"
+                              className={`py-1 px-2 rounded-lg border text-xs cursor-pointer transition shadow-xs ${getDocStatusSelectClass(item.peta_desa)}`}
                             >
                               <option value="-">-</option>
                               <option value="Ada">Ada</option>
                               <option value="Tidak">Tidak</option>
                             </select>
                           ) : (
-                            <span className={`px-2 py-0.5 rounded font-bold ${
-                              item.peta_desa === "Ada"
-                                ? "text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : item.peta_desa === "Tidak"
-                                ? "text-rose-700 bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300"
-                                : "text-gray-400"
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded font-bold ${getDocStatusBadgeClass(item.peta_desa)}`}>
                               {item.peta_desa}
                             </span>
                           )}
@@ -1041,20 +1056,14 @@ export default function Dokse2026Page() {
                             <select
                               value={item.peta_subrt}
                               onChange={(e) => handleUpdateItem(item.idsubsls, "peta_subrt", e.target.value)}
-                              className="py-1 px-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-semibold cursor-pointer"
+                              className={`py-1 px-2 rounded-lg border text-xs cursor-pointer transition shadow-xs ${getDocStatusSelectClass(item.peta_subrt)}`}
                             >
                               <option value="-">-</option>
                               <option value="Ada">Ada</option>
                               <option value="Tidak">Tidak</option>
                             </select>
                           ) : (
-                            <span className={`px-2 py-0.5 rounded font-bold ${
-                              item.peta_subrt === "Ada"
-                                ? "text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : item.peta_subrt === "Tidak"
-                                ? "text-rose-700 bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300"
-                                : "text-gray-400"
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded font-bold ${getDocStatusBadgeClass(item.peta_subrt)}`}>
                               {item.peta_subrt}
                             </span>
                           )}
@@ -1066,20 +1075,14 @@ export default function Dokse2026Page() {
                             <select
                               value={item.dokumen_psls}
                               onChange={(e) => handleUpdateItem(item.idsubsls, "dokumen_psls", e.target.value)}
-                              className="py-1 px-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-semibold cursor-pointer"
+                              className={`py-1 px-2 rounded-lg border text-xs cursor-pointer transition shadow-xs ${getDocStatusSelectClass(item.dokumen_psls)}`}
                             >
                               <option value="-">-</option>
                               <option value="Ada">Ada</option>
                               <option value="Tidak">Tidak</option>
                             </select>
                           ) : (
-                            <span className={`px-2 py-0.5 rounded font-bold ${
-                              item.dokumen_psls === "Ada"
-                                ? "text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : item.dokumen_psls === "Tidak"
-                                ? "text-rose-700 bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300"
-                                : "text-gray-400"
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded font-bold ${getDocStatusBadgeClass(item.dokumen_psls)}`}>
                               {item.dokumen_psls}
                             </span>
                           )}
@@ -1091,20 +1094,14 @@ export default function Dokse2026Page() {
                             <select
                               value={item.peta_terisi}
                               onChange={(e) => handleUpdateItem(item.idsubsls, "peta_terisi", e.target.value)}
-                              className="py-1 px-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs font-semibold cursor-pointer"
+                              className={`py-1 px-2 rounded-lg border text-xs cursor-pointer transition shadow-xs ${getDocStatusSelectClass(item.peta_terisi)}`}
                             >
                               <option value="-">-</option>
                               <option value="Ya">Ya</option>
                               <option value="Tidak">Tidak</option>
                             </select>
                           ) : (
-                            <span className={`px-2 py-0.5 rounded font-bold ${
-                              item.peta_terisi === "Ya"
-                                ? "text-emerald-700 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : item.peta_terisi === "Tidak"
-                                ? "text-rose-700 bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300"
-                                : "text-gray-400"
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded font-bold ${getDocStatusBadgeClass(item.peta_terisi)}`}>
                               {item.peta_terisi}
                             </span>
                           )}
