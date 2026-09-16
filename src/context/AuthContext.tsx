@@ -47,21 +47,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const savedUserId = localStorage.getItem(STORAGE_KEY);
       if (savedUserId && remoteUsers.length > 0) {
         const found = remoteUsers.find((u) => u.id === savedUserId);
-        if (found) setCurrentUser(found);
-        else setCurrentUser(remoteUsers[0] || null);
-      } else if (remoteUsers.length > 0) {
-        setCurrentUser(remoteUsers[0]);
-        localStorage.setItem(STORAGE_KEY, remoteUsers[0].id);
+        if (found) {
+          setCurrentUser(found);
+        } else {
+          // Jika ID di localStorage sudah tidak valid, hapus
+          localStorage.removeItem(STORAGE_KEY);
+          setCurrentUser(null);
+        }
       } else {
-        // Fallback default admin jika database user Supabase belum diisi
-        const defaultAdmin: User = {
-          id: "admin-default",
-          email: "admin@bps.go.id",
-          nama: "Administrator Humas",
-          role: "administrator",
-          is_active: true,
-        };
-        setCurrentUser(defaultAdmin);
+        // Device baru / belum login: biarkan null (tidak otomatis login)
+        setCurrentUser(null);
       }
       setIsLoading(false);
     }

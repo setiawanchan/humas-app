@@ -50,6 +50,17 @@ export default function UserDropdown() {
       .toUpperCase();
   };
 
+  if (!currentUser) {
+    return (
+      <Link
+        href="/login"
+        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow-xs transition"
+      >
+        🔐 Masuk
+      </Link>
+    );
+  }
+
   return (
     <div className="relative">
       <button
