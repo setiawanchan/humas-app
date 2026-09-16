@@ -19,7 +19,7 @@ import { Modal } from "@/components/ui/modal";
 import * as XLSX from "xlsx";
 
 export default function PengolahanPetaPage() {
-  const { currentUser, users } = useAuth();
+  const { currentUser, users, loginWithCredentials, logout } = useAuth();
   const isAdmin =
     currentUser?.role === "administrator" || currentUser?.role === "admin_humas";
 
@@ -31,13 +31,20 @@ export default function PengolahanPetaPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Modal Login Petugas Langsung di Halaman
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginIdentifier, setLoginIdentifier] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   // Filter State
   const [selectedKec, setSelectedKec] = useState<string>("all");
   const [selectedDesa, setSelectedDesa] = useState<string>("all");
   const [selectedPetugas, setSelectedPetugas] = useState<string>("all");
   const [selectedFisik, setSelectedFisik] = useState<string>("all"); // 'all' | 'lengkap' | 'belum_lengkap'
-  const [selectedStatusScan, setSelectedStatusScan] = useState<string>("all"); // 'all' | 'Sudah' | 'Belum'
-  const [selectedStatusOlah, setSelectedStatusOlah] = useState<string>("all"); // 'all' | 'Sudah' | 'Belum'
+  const [selectedStatusScan, setSelectedStatusScan] = useState<string>("all"); // 'all' | 'Sudah' | 'Belum' | '-'
+  const [selectedStatusOlah, setSelectedStatusOlah] = useState<string>("all"); // 'all' | 'Sudah' | 'Belum' | '-'
   const [searchQuery, setSearchQuery] = useState("");
 
   // Pagination State
@@ -60,6 +67,28 @@ export default function PengolahanPetaPage() {
   const listPetugas = useMemo(() => {
     return users.filter((u) => u.role === "eksternal" || u.is_active);
   }, [users]);
+
+  // Handler Submit Login Petugas
+  const handlePetugasLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    if (!loginIdentifier.trim() || !loginPassword.trim()) {
+      setLoginError("Harap isi username/email dan password.");
+      return;
+    }
+
+    setIsLoggingIn(true);
+    const ok = await loginWithCredentials(loginIdentifier.trim(), loginPassword.trim());
+    setIsLoggingIn(false);
+
+    if (ok) {
+      setIsLoginModalOpen(false);
+      setLoginIdentifier("");
+      setLoginPassword("");
+    } else {
+      setLoginError("Username atau Password salah/belum terdaftar!");
+    }
+  };
 
   // Load Data dari Supabase (Dokse + Pengolahan)
   const loadAllData = async () => {
@@ -98,8 +127,8 @@ export default function PengolahanPetaPage() {
         ...dok,
         petugas_id: pengolahan?.petugas_id || null,
         nama_petugas: pengolahan?.nama_petugas || null,
-        status_scan: pengolahan?.status_scan || "Belum",
-        status_olah: pengolahan?.status_olah || "Belum",
+        status_scan: pengolahan?.status_scan || "-",
+        status_olah: pengolahan?.status_olah || "-",
         tgl_selesai_olah: pengolahan?.tgl_selesai_olah || null,
         catatan_pengolahan: pengolahan?.catatan || null,
         isFisikLengkap: isLengkap,
@@ -268,28 +297,38 @@ export default function PengolahanPetaPage() {
     await updatePengolahanRecordInSupabase(updatedRecord);
   };
 
-  // Handler Toggle Status Scan
-  const handleToggleScan = async (item: PengolahanPetaMergedItem) => {
-    // Cek penguncian: Petugas tidak bisa toggle jika dokumen fisik belum lengkap
+  // Helper Styling Dropdown Scan & Olah
+  const getStatusSelectClass = (val: string) => {
+    if (val === "Sudah") {
+      return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 font-bold";
+    }
+    if (val === "Belum") {
+      return "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border-rose-300 dark:border-rose-700 font-bold";
+    }
+    return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700 font-semibold";
+  };
+
+  // Handler Update Status Scan (Dropdown: '-' | 'Sudah' | 'Belum')
+  const handleUpdateScan = async (
+    item: PengolahanPetaMergedItem,
+    newStatus: "-" | "Sudah" | "Belum"
+  ) => {
     if (!isAdmin && !item.isFisikLengkap) {
-      alert("Peta belum bisa di-scan karena dokumen fisik di penerimaan belum lengkap.");
+      alert("Peta belum bisa di-update status scan karena dokumen fisik di penerimaan belum lengkap.");
       return;
     }
 
-    const nextStatus = item.status_scan === "Sudah" ? "Belum" : "Sudah";
     const currentRec = pengolahanMap.get(item.idsubsls);
-
     const updatedRecord: PengolahanRecord = {
       idsubsls: item.idsubsls,
       petugas_id: item.petugas_id,
       nama_petugas: item.nama_petugas,
-      status_scan: nextStatus,
-      status_olah: currentRec?.status_olah || "Belum",
+      status_scan: newStatus,
+      status_olah: currentRec?.status_olah || "-",
       tgl_selesai_olah: currentRec?.tgl_selesai_olah || null,
       catatan: currentRec?.catatan || null,
     };
 
-    // Optimistic Update
     setPengolahanMap((prev) => {
       const next = new Map(prev);
       next.set(item.idsubsls, updatedRecord);
@@ -299,32 +338,32 @@ export default function PengolahanPetaPage() {
     await updatePengolahanRecordInSupabase(updatedRecord);
   };
 
-  // Handler Toggle Status Olah
-  const handleToggleOlah = async (item: PengolahanPetaMergedItem) => {
-    // Cek penguncian: Petugas tidak bisa toggle jika dokumen fisik belum lengkap
+  // Handler Update Status Olah (Dropdown: '-' | 'Sudah' | 'Belum')
+  const handleUpdateOlah = async (
+    item: PengolahanPetaMergedItem,
+    newStatus: "-" | "Sudah" | "Belum"
+  ) => {
     if (!isAdmin && !item.isFisikLengkap) {
-      alert("Peta belum bisa diolah karena dokumen fisik di penerimaan belum lengkap.");
+      alert("Peta belum bisa di-update status olah karena dokumen fisik di penerimaan belum lengkap.");
       return;
     }
 
-    const nextStatus = item.status_olah === "Sudah" ? "Belum" : "Sudah";
     const currentRec = pengolahanMap.get(item.idsubsls);
     const autoDate =
-      nextStatus === "Sudah"
+      newStatus === "Sudah"
         ? currentRec?.tgl_selesai_olah || new Date().toISOString().split("T")[0]
-        : null;
+        : currentRec?.tgl_selesai_olah || null;
 
     const updatedRecord: PengolahanRecord = {
       idsubsls: item.idsubsls,
       petugas_id: item.petugas_id,
       nama_petugas: item.nama_petugas,
-      status_scan: currentRec?.status_scan || "Belum",
-      status_olah: nextStatus,
+      status_scan: currentRec?.status_scan || "-",
+      status_olah: newStatus,
       tgl_selesai_olah: autoDate,
       catatan: currentRec?.catatan || null,
     };
 
-    // Optimistic Update
     setPengolahanMap((prev) => {
       const next = new Map(prev);
       next.set(item.idsubsls, updatedRecord);
@@ -562,6 +601,35 @@ export default function PengolahanPetaPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Status Login / Tombol Login Petugas */}
+          {currentUser ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/80 text-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-semibold text-gray-800 dark:text-gray-200">
+                  {currentUser.nama}
+                </span>
+                <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 font-bold">
+                  {currentUser.role}
+                </span>
+              </div>
+              <button
+                onClick={logout}
+                className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-800 transition cursor-pointer"
+                title="Keluar / Logout Akun"
+              >
+                Keluar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow transition cursor-pointer"
+            >
+              🔐 Login Petugas
+            </button>
+          )}
+
           {isAdmin && (
             <button
               onClick={() => setIsImportModalOpen(true)}
@@ -926,84 +994,64 @@ export default function PengolahanPetaPage() {
                         )}
                       </td>
 
-                      {/* Status Scan */}
+                      {/* Status Scan (Dropdown) */}
                       <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
+                        <select
                           disabled={isLockedForPetugas}
-                          onClick={() => handleToggleScan(item)}
-                          className={`px-3 py-1 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5 ${
+                          value={item.status_scan}
+                          onChange={(e) =>
+                            handleUpdateScan(
+                              item,
+                              e.target.value as "-" | "Sudah" | "Belum"
+                            )
+                          }
+                          className={`text-xs rounded-lg px-2.5 py-1.5 border transition cursor-pointer ${getStatusSelectClass(
+                            item.status_scan
+                          )} ${
                             isLockedForPetugas
                               ? "opacity-40 cursor-not-allowed bg-gray-100 text-gray-400 dark:bg-gray-800"
-                              : item.status_scan === "Sudah"
-                              ? "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-700 hover:bg-cyan-100"
-                              : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-200"
+                              : ""
                           }`}
                           title={
                             isLockedForPetugas
                               ? "Terkunci: Dokumen fisik penerimaan belum lengkap."
-                              : "Klik untuk ubah status scan"
+                              : "Pilih status scan peta"
                           }
                         >
-                          {item.status_scan === "Sudah" ? (
-                            <>
-                              <svg
-                                className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                              Sudah Scan
-                            </>
-                          ) : (
-                            "Belum Scan"
-                          )}
-                        </button>
+                          <option value="-">- (Strip)</option>
+                          <option value="Sudah">Sudah</option>
+                          <option value="Belum">Belum</option>
+                        </select>
                       </td>
 
-                      {/* Status Olah */}
+                      {/* Status Olah (Dropdown) */}
                       <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
+                        <select
                           disabled={isLockedForPetugas}
-                          onClick={() => handleToggleOlah(item)}
-                          className={`px-3 py-1 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5 ${
+                          value={item.status_olah}
+                          onChange={(e) =>
+                            handleUpdateOlah(
+                              item,
+                              e.target.value as "-" | "Sudah" | "Belum"
+                            )
+                          }
+                          className={`text-xs rounded-lg px-2.5 py-1.5 border transition cursor-pointer ${getStatusSelectClass(
+                            item.status_olah
+                          )} ${
                             isLockedForPetugas
                               ? "opacity-40 cursor-not-allowed bg-gray-100 text-gray-400 dark:bg-gray-800"
-                              : item.status_olah === "Sudah"
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100"
-                              : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-200"
+                              : ""
                           }`}
                           title={
                             isLockedForPetugas
                               ? "Terkunci: Dokumen fisik penerimaan belum lengkap."
-                              : "Klik untuk ubah status olah"
+                              : "Pilih status pengolahan peta"
                           }
                         >
-                          {item.status_olah === "Sudah" ? (
-                            <>
-                              <svg
-                                className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                              Selesai Olah
-                            </>
-                          ) : (
-                            "Belum Olah"
-                          )}
-                        </button>
+                          <option value="-">- (Strip)</option>
+                          <option value="Sudah">Sudah</option>
+                          <option value="Belum">Belum</option>
+                        </select>
                       </td>
 
                       {/* Tgl Selesai & Catatan */}
@@ -1242,6 +1290,87 @@ export default function PengolahanPetaPage() {
               Tutup
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Modal Login Petugas Langsung di Halaman */}
+      <Modal
+        isOpen={isLoginModalOpen}
+        onClose={() => {
+          setIsLoginModalOpen(false);
+          setLoginError("");
+        }}
+        className="max-w-md p-6"
+      >
+        <div className="space-y-4">
+          <div className="text-center">
+            <div className="h-12 w-12 rounded-2xl bg-brand-500 text-white font-bold text-xl flex items-center justify-center mx-auto mb-2 shadow-md">
+              BPS
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+              Login Petugas Pengolahan
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Masuk menggunakan akun petugas untuk melihat dan mengupdate peta tugas Anda.
+            </p>
+          </div>
+
+          {loginError && (
+            <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300 font-medium flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handlePetugasLogin} className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                Username / Email
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Masukkan username atau email..."
+                value={loginIdentifier}
+                onChange={(e) => setLoginIdentifier(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                Password / Kata Sandi
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Masukkan kata sandi..."
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLoginModalOpen(false);
+                  setLoginError("");
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="px-5 py-2 rounded-xl text-xs font-semibold bg-brand-500 hover:bg-brand-600 text-white transition shadow-sm disabled:opacity-50"
+              >
+                {isLoggingIn ? "Memverifikasi..." : "Masuk Sistem"}
+              </button>
+            </div>
+          </form>
         </div>
       </Modal>
     </div>

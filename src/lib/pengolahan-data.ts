@@ -4,8 +4,8 @@ export interface PengolahanRecord {
   idsubsls: string;
   petugas_id: string | null;
   nama_petugas: string | null;
-  status_scan: "Belum" | "Sudah";
-  status_olah: "Belum" | "Sudah";
+  status_scan: "-" | "Belum" | "Sudah";
+  status_olah: "-" | "Belum" | "Sudah";
   tgl_selesai_olah: string | null;
   catatan: string | null;
   created_at?: string;
@@ -16,8 +16,8 @@ export interface PengolahanRecord {
 export interface PengolahanPetaMergedItem extends DokseItem {
   petugas_id: string | null;
   nama_petugas: string | null;
-  status_scan: "Belum" | "Sudah";
-  status_olah: "Belum" | "Sudah";
+  status_scan: "-" | "Belum" | "Sudah";
+  status_olah: "-" | "Belum" | "Sudah";
   tgl_selesai_olah: string | null;
   catatan_pengolahan: string | null;
   isFisikLengkap: boolean;
