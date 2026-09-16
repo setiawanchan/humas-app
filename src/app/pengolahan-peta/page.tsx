@@ -577,102 +577,101 @@ export default function PengolahanPetaPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-950/50 dark:text-brand-400 border border-brand-200 dark:border-brand-800">
-              Sensus Ekonomi 2026
-            </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Alokasi & Progres Olah
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-            Pengolahan & Scanning Peta
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {isAdmin
-              ? "Kelola alokasi pembagian peta ke 16 petugas, pantau hasil scan, dan progres pengolahan dokumen fisik."
-              : `Halo ${currentUser?.nama || "Petugas"}, berikut adalah peta yang dialokasikan khusus untuk Anda scan dan olah.`}
-          </p>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Status Login / Tombol Login Petugas */}
-          {currentUser ? (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/80 text-xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-semibold text-gray-800 dark:text-gray-200">
-                  {currentUser.nama}
-                </span>
-                <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 font-bold">
-                  {currentUser.role}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
+      {/* Standalone Header Bar Tanpa Sidebar */}
+      <header className="sticky top-0 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 shadow-xs">
+        <div className="max-w-[1700px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="h-9 w-9 rounded-xl bg-brand-500 flex items-center justify-center text-white font-bold text-sm shadow hover:bg-brand-600 transition"
+              title="Kembali ke Beranda"
+            >
+              BPS
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold text-gray-900 dark:text-white">
+                  🗺️ Pengolahan & Scanning Peta
+                </h1>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-brand-50 text-brand-600 dark:bg-brand-950/50 dark:text-brand-400 border border-brand-200 dark:border-brand-800">
+                  Sensus Ekonomi 2026
                 </span>
               </div>
-              <button
-                onClick={logout}
-                className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-800 transition cursor-pointer"
-                title="Keluar / Logout Akun"
-              >
-                Keluar
-              </button>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {isAdmin
+                  ? "Sistem Distribusi & Pengawasan Pengolahan Peta BPS Kabupaten Lebak"
+                  : `Portal Petugas Pengolahan: ${currentUser?.nama || "Petugas"}`}
+              </p>
             </div>
-          ) : (
-            <button
-              onClick={() => setIsLoginModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow transition cursor-pointer"
-            >
-              🔐 Login Petugas
-            </button>
-          )}
+          </div>
 
-          {isAdmin && (
-            <button
-              onClick={() => setIsImportModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition shadow-sm"
+          {/* Action Buttons & Status Login */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/dok-se2026"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold transition"
+              title="Lihat Pengecekan Dok-SE2026"
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+              📋 Dok-SE2026
+            </Link>
+
+            {isAdmin && (
+              <button
+                onClick={() => setIsImportModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition shadow-xs cursor-pointer"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                />
-              </svg>
-              Import Alokasi Excel
-            </button>
-          )}
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Import Alokasi
+              </button>
+            )}
 
-          <button
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium transition"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+            <button
+              onClick={handleExportCSV}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold transition shadow-xs cursor-pointer"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            Export Rekap CSV
-          </button>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export CSV
+            </button>
+
+            {/* Status Login / Tombol Login Petugas */}
+            {currentUser ? (
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="font-semibold text-gray-800 dark:text-gray-200 truncate max-w-[130px]">
+                    {currentUser.nama}
+                  </span>
+                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 font-bold">
+                    {currentUser.role}
+                  </span>
+                </div>
+                <button
+                  onClick={logout}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-800 transition cursor-pointer"
+                  title="Keluar / Logout Akun"
+                >
+                  Keluar
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsLoginModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow transition cursor-pointer"
+              >
+                🔐 Login Petugas
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="max-w-[1700px] mx-auto p-4 md:p-6 space-y-4">
 
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -746,41 +745,29 @@ export default function PengolahanPetaPage() {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="Cari ID SLS, nama SLS, desa, atau petugas..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-            <svg
-              className="w-4 h-4 absolute left-3.5 top-3 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
+      {/* Menu Filter & Pencarian Proporsional */}
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 p-4 shadow-sm space-y-3">
+        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center justify-between">
+          <span>Filter Wilayah, Petugas & Status:</span>
+          <span className="text-[11px] font-normal lowercase text-gray-400">
+            Ditemukan: <strong className="text-brand-600 dark:text-brand-400 font-semibold">{filteredData.length}</strong> dari {mergedDataList.length} SLS
+          </span>
+        </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Filter Kecamatan */}
+        {/* Dropdown Filters Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 items-center">
+          {/* 1. Filter Kecamatan */}
+          <div className="md:col-span-3">
+            <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+              Kecamatan
+            </label>
             <select
               value={selectedKec}
               onChange={(e) => {
                 setSelectedKec(e.target.value);
                 setSelectedDesa("all");
               }}
-              className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
             >
               <option value="all">Semua Kecamatan</option>
               {listKecamatan.map((k) => (
@@ -789,27 +776,44 @@ export default function PengolahanPetaPage() {
                 </option>
               ))}
             </select>
+          </div>
 
-            {/* Filter Desa */}
+          {/* 2. Filter Desa */}
+          <div className="md:col-span-3">
+            <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+              Desa / Kelurahan
+            </label>
             <select
               value={selectedDesa}
+              disabled={selectedKec === "all"}
               onChange={(e) => setSelectedDesa(e.target.value)}
-              className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <option value="all">Semua Desa</option>
-              {listDesa.map((d) => (
-                <option key={d.kode} value={d.kode}>
-                  [{d.kode}] {d.nama}
-                </option>
-              ))}
+              {selectedKec === "all" ? (
+                <option value="all">-- Pilih Kecamatan Terlebih Dahulu --</option>
+              ) : (
+                <>
+                  <option value="all">Semua Desa/Kelurahan</option>
+                  {listDesa.map((d) => (
+                    <option key={d.kode} value={d.kode}>
+                      [{d.kode}] {d.nama}
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
+          </div>
 
-            {/* Filter Petugas (Khusus Admin) */}
-            {isAdmin && (
+          {/* 3. Filter Petugas (Admin view) / Status Fisik (Petugas view) */}
+          {isAdmin ? (
+            <div className="md:col-span-3">
+              <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                Alokasi Petugas
+              </label>
               <select
                 value={selectedPetugas}
                 onChange={(e) => setSelectedPetugas(e.target.value)}
-                className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
               >
                 <option value="all">Semua Petugas</option>
                 <option value="unassigned">-- Belum Dialokasikan --</option>
@@ -819,42 +823,96 @@ export default function PengolahanPetaPage() {
                   </option>
                 ))}
               </select>
+            </div>
+          ) : (
+            <div className="md:col-span-3">
+              <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                Fisik Penerimaan
+              </label>
+              <select
+                value={selectedFisik}
+                onChange={(e) => setSelectedFisik(e.target.value)}
+                className="w-full py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
+              >
+                <option value="all">Fisik: Semua Status</option>
+                <option value="lengkap">Lengkap (Siap Olah)</option>
+                <option value="belum_lengkap">Belum Lengkap (Terkunci)</option>
+              </select>
+            </div>
+          )}
+
+          {/* 4. Status Olah & Scan */}
+          <div className="md:col-span-3 grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                Status Scan
+              </label>
+              <select
+                value={selectedStatusScan}
+                onChange={(e) => setSelectedStatusScan(e.target.value)}
+                className="w-full py-2 px-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
+              >
+                <option value="all">Semua</option>
+                <option value="Sudah">Sudah</option>
+                <option value="Belum">Belum</option>
+                <option value="-">-</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                Status Olah
+              </label>
+              <select
+                value={selectedStatusOlah}
+                onChange={(e) => setSelectedStatusOlah(e.target.value)}
+                className="w-full py-2 px-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
+              >
+                <option value="all">Semua</option>
+                <option value="Sudah">Sudah</option>
+                <option value="Belum">Belum</option>
+                <option value="-">-</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Dedicated Search Bar Row with Reset */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2.5 border-t border-gray-100 dark:border-gray-700">
+          <div className="relative w-full sm:w-96">
+            <svg
+              className="absolute left-3.5 top-2.5 h-4 w-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Cari SLS, ID SubSLS, Desa, atau Petugas..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-10 pr-3 py-2 text-xs font-medium rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-2xs"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {isAdmin && (
+              <select
+                value={selectedFisik}
+                onChange={(e) => setSelectedFisik(e.target.value)}
+                className="py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
+              >
+                <option value="all">Fisik: Semua Status</option>
+                <option value="lengkap">Fisik: Lengkap</option>
+                <option value="belum_lengkap">Fisik: Belum Lengkap</option>
+              </select>
             )}
 
-            {/* Filter Kelengkapan Dokumen Fisik */}
-            <select
-              value={selectedFisik}
-              onChange={(e) => setSelectedFisik(e.target.value)}
-              className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="all">Fisik: Semua</option>
-              <option value="lengkap">Fisik: Lengkap (Siap Olah)</option>
-              <option value="belum_lengkap">Fisik: Belum Lengkap (Terkunci)</option>
-            </select>
-
-            {/* Filter Status Scan */}
-            <select
-              value={selectedStatusScan}
-              onChange={(e) => setSelectedStatusScan(e.target.value)}
-              className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="all">Scan: Semua</option>
-              <option value="Sudah">Scan: Sudah</option>
-              <option value="Belum">Scan: Belum</option>
-            </select>
-
-            {/* Filter Status Olah */}
-            <select
-              value={selectedStatusOlah}
-              onChange={(e) => setSelectedStatusOlah(e.target.value)}
-              className="px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="all">Olah: Semua</option>
-              <option value="Sudah">Olah: Sudah</option>
-              <option value="Belum">Olah: Belum</option>
-            </select>
-
-            {/* Tombol Reset Filter */}
             <button
               onClick={() => {
                 setSelectedKec("all");
@@ -864,11 +922,11 @@ export default function PengolahanPetaPage() {
                 setSelectedStatusScan("all");
                 setSelectedStatusOlah("all");
                 setSearchQuery("");
+                setCurrentPage(1);
               }}
-              className="px-3 py-2 text-xs rounded-xl text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition"
-              title="Reset Filter"
+              className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
             >
-              Reset
+              <span>✕</span> Reset Filter
             </button>
           </div>
         </div>
@@ -1018,7 +1076,7 @@ export default function PengolahanPetaPage() {
                               : "Pilih status scan peta"
                           }
                         >
-                          <option value="-">- (Strip)</option>
+                          <option value="-">-</option>
                           <option value="Sudah">Sudah</option>
                           <option value="Belum">Belum</option>
                         </select>
@@ -1048,7 +1106,7 @@ export default function PengolahanPetaPage() {
                               : "Pilih status pengolahan peta"
                           }
                         >
-                          <option value="-">- (Strip)</option>
+                          <option value="-">-</option>
                           <option value="Sudah">Sudah</option>
                           <option value="Belum">Belum</option>
                         </select>
@@ -1141,6 +1199,7 @@ export default function PengolahanPetaPage() {
           </div>
         </div>
       </div>
+      </main>
 
       {/* Modal Edit Detail (Tanggal Selesai & Catatan) */}
       <Modal
