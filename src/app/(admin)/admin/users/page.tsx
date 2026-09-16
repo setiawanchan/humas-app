@@ -4,6 +4,8 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { User, Role } from "@/lib/mock-data";
 import { Modal } from "@/components/ui/modal";
+import { bulkUpsertUsersInSupabase } from "@/lib/supabase/user-service";
+import * as XLSX from "xlsx";
 
 // Helper Role Badge Styling & Label
 const getRoleBadge = (role: Role) => {
@@ -33,7 +35,7 @@ const getRoleBadge = (role: Role) => {
 };
 
 export default function AdminUsersPage() {
-  const { currentUser, users, addUser, updateUser, toggleUserStatus, deleteUser } = useAuth();
+  const { currentUser, users, addUser, updateUser, toggleUserStatus, deleteUser, refreshUsers } = useAuth();
   const isAdmin = currentUser?.role === "administrator";
 
   // State Search & Filter
@@ -59,6 +61,192 @@ export default function AdminUsersPage() {
 
   // State Modal Konfirmasi Hapus
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+
+  // State Modal Import Excel User
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importError, setImportError] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Handler Unduh Template Excel Pengguna
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Nama Lengkap": "Ahmad Fauzi",
+        "Email": "ahmad.fauzi@bps.go.id",
+        "Username": "ahmad_fauzi",
+        "Password": "Password123",
+        "Role": "pegawai",
+        "Status Aktif": "Ya",
+      },
+      {
+        "Nama Lengkap": "Petugas Pengolahan 01",
+        "Email": "petugas01@gmail.com",
+        "Username": "petugas01",
+        "Password": "",
+        "Role": "eksternal",
+        "Status Aktif": "Ya",
+      },
+      {
+        "Nama Lengkap": "Siti Admin Humas",
+        "Email": "siti.humas@bps.go.id",
+        "Username": "siti_humas",
+        "Password": "admin123",
+        "Role": "admin_humas",
+        "Status Aktif": "Ya",
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template User");
+    XLSX.writeFile(workbook, "template-import-user-bps.xlsx");
+  };
+
+  // Handler Parse File Excel (.xlsx, .xls, .csv)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError("");
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const workbook = XLSX.read(bstr, { type: "binary" });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+
+        if (!json || json.length === 0) {
+          setImportError("File Excel kosong atau format tidak sesuai!");
+          return;
+        }
+
+        processUserImportRows(json);
+      } catch (err: any) {
+        setImportError("Gagal membaca file Excel: " + (err?.message || "Format tidak didukung"));
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // Handler Parse Teks / CSV Manual
+  const handleManualTextImport = () => {
+    if (!importText.trim()) {
+      setImportError("Tempel data teks / CSV terlebih dahulu!");
+      return;
+    }
+    setImportError("");
+
+    try {
+      const lines = importText.trim().split(/\r?\n/);
+      if (lines.length < 2) {
+        setImportError("Data harus memiliki baris judul kolom dan minimal satu baris data!");
+        return;
+      }
+
+      const headers = lines[0].split(/,|\t/).map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
+      const rows: any[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const cols = lines[i].split(/,|\t/).map((c) => c.trim().replace(/^"|"$/g, ""));
+        const row: Record<string, string> = {};
+        headers.forEach((h, idx) => {
+          row[h] = cols[idx] || "";
+        });
+        rows.push(row);
+      }
+
+      processUserImportRows(rows);
+    } catch (err: any) {
+      setImportError("Gagal memproses teks: " + (err?.message || "Format tidak valid"));
+    }
+  };
+
+  // Eksekutor Penyimpanan Data Impor ke Supabase
+  const processUserImportRows = async (rows: any[]) => {
+    setIsImporting(true);
+    setImportError("");
+
+    const userListToUpsert: Array<Omit<User, "id">> = [];
+
+    rows.forEach((row) => {
+      const nama = String(
+        row["Nama Lengkap"] || row["Nama"] || row["nama"] || row["nama_lengkap"] || ""
+      ).trim();
+
+      const email = String(
+        row["Email"] || row["email"] || row["E-mail"] || ""
+      ).trim();
+
+      const username = String(
+        row["Username"] || row["username"] || row["User"] || ""
+      ).trim();
+
+      const password = String(
+        row["Password"] || row["password"] || row["Kata Sandi"] || ""
+      ).trim();
+
+      let rawRole = String(
+        row["Role"] || row["role"] || row["Peran"] || "eksternal"
+      ).trim().toLowerCase();
+
+      // Normalisasi role
+      let role: Role = "eksternal";
+      if (rawRole.includes("admin_humas") || rawRole.includes("humas")) {
+        role = "admin_humas";
+      } else if (rawRole.includes("administrator") || rawRole === "admin") {
+        role = "administrator";
+      } else if (rawRole.includes("pegawai") || rawRole.includes("bps")) {
+        role = "pegawai";
+      } else {
+        role = "eksternal";
+      }
+
+      const rawStatus = String(
+        row["Status Aktif"] || row["Status"] || row["is_active"] || row["status"] || "Ya"
+      ).trim().toLowerCase();
+
+      const is_active = rawStatus === "ya" || rawStatus === "true" || rawStatus === "1" || rawStatus === "aktif";
+
+      // Validasi baris: harus memiliki minimal nama atau email atau username
+      if (nama || email || username) {
+        userListToUpsert.push({
+          nama: nama || username || email.split("@")[0] || "User Baru",
+          email: email || `${username || "user_" + Date.now()}@bps.go.id`,
+          username: username || (email ? email.split("@")[0] : `user_${Date.now()}`),
+          password: password || undefined,
+          role,
+          is_active,
+        });
+      }
+    });
+
+    if (userListToUpsert.length === 0) {
+      setImportError("Tidak ada baris data pengguna yang valid untuk diimpor!");
+      setIsImporting(false);
+      return;
+    }
+
+    try {
+      const result = await bulkUpsertUsersInSupabase(userListToUpsert);
+      await refreshUsers();
+      setIsImportModalOpen(false);
+      setImportText("");
+
+      let message = `Berhasil memproses import:\n- ${result.successCount} user baru ditambahkan\n- ${result.updatedCount} user lama diperbarui`;
+      if (result.errors.length > 0) {
+        message += `\n\nCatatan kendala (${result.errors.length}):\n` + result.errors.slice(0, 3).join("\n");
+      }
+      alert(message);
+    } catch (err: any) {
+      setImportError("Terjadi kesalahan saat menyimpan ke database: " + (err?.message || "Unknown error"));
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   // Reset pagination to page 1 whenever filters change
   useEffect(() => {
@@ -197,15 +385,39 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreateForm}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-5 py-3 font-semibold text-sm shadow-md hover:shadow-lg transition duration-200 cursor-pointer"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-          </svg>
-          Tambah User Baru
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 font-semibold text-xs md:text-sm shadow-sm transition duration-200 cursor-pointer"
+            title="Import Akun Pengguna dari File Excel"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import Excel
+          </button>
+
+          <button
+            onClick={handleDownloadTemplate}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2.5 font-semibold text-xs md:text-sm shadow-2xs transition duration-200 cursor-pointer"
+            title="Unduh format template Excel"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Template
+          </button>
+
+          <button
+            onClick={handleOpenCreateForm}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 font-semibold text-xs md:text-sm shadow-sm hover:shadow-md transition duration-200 cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Tambah User
+          </button>
+        </div>
       </div>
 
       {/* Filter Toolbar */}
@@ -614,6 +826,118 @@ export default function AdminUsersPage() {
           </div>
         </Modal>
       )}
+
+      {/* ===================== MODAL IMPORT EXCEL USER ===================== */}
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={() => {
+          setIsImportModalOpen(false);
+          setImportError("");
+          setImportText("");
+        }}
+        className="max-w-xl p-6"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Import User dari Excel / CSV
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Unggah daftar pengguna untuk membuat akun baru atau memperbarui akun yang sudah ada.
+              </p>
+            </div>
+            <button
+              onClick={handleDownloadTemplate}
+              className="px-3 py-1.5 rounded-lg border border-brand-200 bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-400 text-xs font-semibold hover:bg-brand-100 transition cursor-pointer flex items-center gap-1"
+              title="Unduh Template Excel"
+            >
+              📥 Template Excel
+            </button>
+          </div>
+
+          {importError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300">
+              ⚠️ {importError}
+            </div>
+          )}
+
+          {/* Opsi 1: Upload File Langsung */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+              Metode 1: Upload File (.xlsx, .xls, .csv)
+            </label>
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-4 text-center hover:border-brand-500 transition cursor-pointer bg-gray-50 dark:bg-gray-900">
+              <input
+                type="file"
+                id="userExcelFileInput"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileUpload}
+                disabled={isImporting}
+                className="hidden"
+              />
+              <label htmlFor="userExcelFileInput" className="cursor-pointer block">
+                <svg className="w-8 h-8 mx-auto text-gray-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span className="text-xs font-semibold text-brand-600 dark:text-brand-400">
+                  {isImporting ? "Sedang memproses data..." : "Klik untuk memilih file Excel (.xlsx) atau seret ke sini"}
+                </span>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Kolom yang didukung: Nama Lengkap, Email, Username, Password, Role, Status Aktif
+                </p>
+              </label>
+            </div>
+          </div>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+            <span className="flex-shrink mx-3 text-[11px] text-gray-400 uppercase font-semibold">ATAU</span>
+            <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+          </div>
+
+          {/* Opsi 2: Salin Tempel Teks/Tabel */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
+              Metode 2: Salin & Tempel Data dari Spreadsheet
+            </label>
+            <textarea
+              rows={4}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              disabled={isImporting}
+              placeholder={`Nama Lengkap\tEmail\tUsername\tPassword\tRole\tStatus Aktif\nBudi Santoso\tbudi@bps.go.id\tbudi_s\tadmin123\tpegawai\tYa\nPetugas 01\tpetugas01@gmail.com\tpetugas01\t\teksternal\tYa`}
+              className="w-full p-3 font-mono text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <p className="text-[11px] text-gray-400">
+              * Password kosong akan otomatis diatur ke password bawaan (<strong>admin123</strong>).
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={() => {
+                setIsImportModalOpen(false);
+                setImportError("");
+                setImportText("");
+              }}
+              disabled={isImporting}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              onClick={handleManualTextImport}
+              disabled={isImporting || !importText.trim()}
+              className="px-5 py-2 rounded-xl text-xs font-semibold bg-brand-500 hover:bg-brand-600 text-white transition shadow-sm disabled:opacity-50"
+            >
+              {isImporting ? "Memproses..." : "Proses Impor Teks"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

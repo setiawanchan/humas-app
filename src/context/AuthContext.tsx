@@ -20,6 +20,7 @@ interface AuthContextType {
   updateUser: (id: string, updatedData: Partial<User>) => void;
   toggleUserStatus: (id: string) => void;
   deleteUser: (id: string) => void;
+  refreshUsers: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -31,6 +32,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [usersList, setUsersList] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const refreshUsers = async () => {
+    const remoteUsers = await getUsersFromSupabase();
+    setUsersList(remoteUsers || []);
+  };
 
   useEffect(() => {
     async function initUsers() {
@@ -134,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateUser,
         toggleUserStatus,
         deleteUser,
+        refreshUsers,
         isLoading,
       }}
     >

@@ -41,6 +41,78 @@ export async function insertUserToSupabase(user: Omit<User, "id">): Promise<User
   return data?.[0] as User;
 }
 
+// 2b. Bulk Upsert Pengguna dari Excel (Insert baru atau Update jika email/username sudah ada)
+export async function bulkUpsertUsersInSupabase(
+  userList: Array<Omit<User, "id"> & { id?: string }>
+): Promise<{ successCount: number; updatedCount: number; errors: string[] }> {
+  const defaultHashedPass = await hashPassword("admin123");
+  const existingUsers = await getUsersFromSupabase();
+
+  let successCount = 0;
+  let updatedCount = 0;
+  const errors: string[] = [];
+
+  for (const item of userList) {
+    try {
+      const cleanEmail = item.email?.trim().toLowerCase();
+      const cleanUsername = item.username?.trim().toLowerCase();
+
+      // Cek apakah user sudah ada berdasarkan email atau username
+      const existing = existingUsers.find(
+        (u) =>
+          (cleanEmail && u.email?.trim().toLowerCase() === cleanEmail) ||
+          (cleanUsername && u.username?.trim().toLowerCase() === cleanUsername)
+      );
+
+      let hashedPassword = defaultHashedPass;
+      if (item.password && item.password.trim()) {
+        hashedPassword = await hashPassword(item.password.trim());
+      } else if (existing?.password) {
+        // Pertahankan password lama jika ada
+        hashedPassword = existing.password;
+      }
+
+      const payload: any = {
+        nama: item.nama.trim(),
+        email: cleanEmail || `${cleanUsername || "user"}@bps.go.id`,
+        username: cleanUsername || cleanEmail.split("@")[0],
+        role: item.role || "eksternal",
+        is_active: item.is_active ?? true,
+        password: hashedPassword,
+      };
+
+      if (existing) {
+        // Update user yang sudah ada
+        const { error: updateErr } = await supabase
+          .from("app_users")
+          .update(payload)
+          .eq("id", existing.id);
+
+        if (updateErr) {
+          errors.push(`Gagal update user ${item.nama}: ${updateErr.message}`);
+        } else {
+          updatedCount++;
+        }
+      } else {
+        // Insert user baru
+        const { error: insertErr } = await supabase
+          .from("app_users")
+          .insert(payload);
+
+        if (insertErr) {
+          errors.push(`Gagal insert user ${item.nama}: ${insertErr.message}`);
+        } else {
+          successCount++;
+        }
+      }
+    } catch (err: any) {
+      errors.push(`Error pada baris ${item.nama}: ${err?.message || "Unknown"}`);
+    }
+  }
+
+  return { successCount, updatedCount, errors };
+}
+
 // 3. Update data pengguna di Supabase (dengan hash jika password diganti)
 export async function updateUserInSupabase(id: string, updatedData: Partial<User>): Promise<boolean> {
   const payload = { ...updatedData };
