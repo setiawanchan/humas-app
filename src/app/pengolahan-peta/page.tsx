@@ -451,29 +451,27 @@ export default function PengolahanPetaPage() {
     document.body.removeChild(link);
   };
 
-  // Handler Download Template Import Alokasi Excel
+  // Handler Download Template Import Alokasi Excel (Cukup idsubsls dan email_petugas)
   const handleDownloadTemplateAlokasi = () => {
     const sampleData = [
       {
         idsubsls: "360201000100100",
-        nama_sls: "RT 001 RW 01",
-        nama_kec: "Malingping",
-        nama_desa: "Kecapi",
-        username_petugas: "petugas1",
+        email_petugas: "petugas01@gmail.com",
       },
       {
         idsubsls: "360201000100200",
-        nama_sls: "RT 002 RW 01",
-        nama_kec: "Malingping",
-        nama_desa: "Kecapi",
-        username_petugas: "petugas2",
+        email_petugas: "petugas02@gmail.com",
+      },
+      {
+        idsubsls: "360201000100300",
+        email_petugas: "ahmad.fauzi@bps.go.id",
       },
     ];
 
     const ws = XLSX.utils.json_to_sheet(sampleData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template_Alokasi");
-    XLSX.writeFile(wb, "template-alokasi-pengolahan-peta.xlsx");
+    XLSX.writeFile(wb, "template-alokasi-petugas.xlsx");
   };
 
   // Handler Import File Excel / Paste Teks Alokasi
@@ -507,8 +505,13 @@ export default function PengolahanPetaPage() {
         row["ID SubSLS"] ||
         row["ID SLS"] ||
         row["id_subsls"] ||
+        row["idsls"] ||
         row.ID;
       const rawUser =
+        row.email_petugas ||
+        row["Email Petugas"] ||
+        row["email"] ||
+        row["Email"] ||
         row.username_petugas ||
         row["Username Petugas"] ||
         row["Petugas"] ||
@@ -519,11 +522,12 @@ export default function PengolahanPetaPage() {
         const idsubsls = String(rawId).trim();
         const userQuery = String(rawUser).trim().toLowerCase();
 
-        // Cari petugas berdasarkan id, username, atau nama
+        // Cari petugas berdasarkan email, username, id, atau nama
         const foundUser = users.find(
           (u) =>
-            u.id.toLowerCase() === userQuery ||
+            u.email?.toLowerCase() === userQuery ||
             u.username?.toLowerCase() === userQuery ||
+            u.id.toLowerCase() === userQuery ||
             u.nama.toLowerCase() === userQuery
         );
 
@@ -533,8 +537,8 @@ export default function PengolahanPetaPage() {
             idsubsls,
             petugas_id: foundUser.id,
             nama_petugas: foundUser.nama,
-            status_scan: currentRec?.status_scan || "Belum",
-            status_olah: currentRec?.status_olah || "Belum",
+            status_scan: currentRec?.status_scan || "-",
+            status_olah: currentRec?.status_olah || "-",
             tgl_selesai_olah: currentRec?.tgl_selesai_olah || null,
             catatan: currentRec?.catatan || null,
           });
@@ -545,7 +549,7 @@ export default function PengolahanPetaPage() {
 
     if (updates.length === 0) {
       setImportError(
-        "Tidak ada baris yang valid atau username petugas tidak cocok dengan data pengguna."
+        "Tidak ada baris yang valid atau email/username petugas tidak cocok dengan data pengguna."
       );
       return;
     }
@@ -1289,8 +1293,7 @@ export default function PengolahanPetaPage() {
 
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Unggah file Excel yang berisi kolom <code>idsubsls</code> dan{" "}
-            <code>username_petugas</code> untuk mengalokasikan peta secara massal ke
-            16 petugas.
+            <code>email_petugas</code> untuk mengalokasikan peta ke petugas pengolahan.
           </p>
 
           {importError && (
