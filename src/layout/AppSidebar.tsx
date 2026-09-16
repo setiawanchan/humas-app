@@ -14,6 +14,7 @@ import {
   UserCircleIcon,
   BoxCubeIcon,
   FolderIcon,
+  TaskIcon,
 } from "../icons/index";
 
 type NavItem = {
@@ -34,21 +35,30 @@ export default function AppSidebar() {
       name: "Dashboard",
       icon: <GridIcon />,
       path: "/",
+      rolesAllowed: ["administrator", "admin_humas", "pegawai"],
+    },
+    {
+      name: "Pengolahan Peta",
+      icon: <TaskIcon />,
+      path: "/pengolahan-peta",
     },
     {
       name: "Dokumentasi",
       icon: <BoxCubeIcon />,
       path: "/dokumentasi",
+      rolesAllowed: ["administrator", "admin_humas", "pegawai"],
     },
     {
       name: "Arsip",
       icon: <FolderIcon />,
       path: "/arsip",
+      rolesAllowed: ["administrator", "admin_humas", "pegawai"],
     },
     {
       name: "Kalender Konten",
       icon: <CalenderIcon />,
       path: "/kalender-konten",
+      rolesAllowed: ["administrator", "admin_humas", "pegawai"],
     },
     {
       name: "Admin",
@@ -64,8 +74,12 @@ export default function AppSidebar() {
 
   // Filter navigation items by role
   const filteredNavItems = mainNavItems.filter((item) => {
-    if (!item.rolesAllowed) return true;
     if (!currentUser) return false;
+    // Khusus role eksternal, hanya izinkan halaman pengolahan-peta
+    if (currentUser.role === "eksternal") {
+      return item.path === "/pengolahan-peta";
+    }
+    if (!item.rolesAllowed) return true;
     return item.rolesAllowed.includes(currentUser.role);
   });
 
