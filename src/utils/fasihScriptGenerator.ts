@@ -19,6 +19,7 @@ export function generateBulkRejectScript(
       desa: it.desa || "",
       sls: it.sls || "",
       idsls: it.idsls || "",
+      namaUsaha: it.nama_usaha || "",
     })),
     null,
     2
@@ -103,7 +104,9 @@ export function generateBulkRejectScript(
   for (let i = 0; i < targetList.length; i++) {
     const item = targetList[i];
     const assignmentId = item.assignmentId;
-    const label = item.kecamatan ? (item.kecamatan + ' - ' + item.desa + ' (' + item.idsls + ')') : assignmentId;
+    const label = item.namaUsaha
+      ? (item.namaUsaha + ' - ' + item.kecamatan + '/' + item.desa)
+      : (item.kecamatan ? (item.kecamatan + ' - ' + item.desa + ' (' + item.idsls + ')') : assignmentId);
 
     console.log("%c[" + (i + 1) + "/" + targetList.length + "] Memproses: " + label + "...", "color: #94a3b8;");
 

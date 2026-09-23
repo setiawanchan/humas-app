@@ -4,6 +4,7 @@ export interface FasihRejectItem {
   desa: string | null;
   sls: string | null;
   idsls: string | null;
+  nama_usaha: string | null;
   link: string;
   assignment_id: string | null;
   status: "pending" | "rejected" | "failed";

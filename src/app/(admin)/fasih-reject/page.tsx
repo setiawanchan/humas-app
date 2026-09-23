@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { FasihRejectItem } from "@/types/fasih-reject";
 import RejectUploadModal from "@/components/fasih-reject/RejectUploadModal";
@@ -10,54 +10,211 @@ export default function FasihRejectPage() {
   const [items, setItems] = useState<FasihRejectItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Filter States
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [kecamatanFilter, setKecamatanFilter] = useState<string>("all");
+  const [desaFilter, setDesaFilter] = useState<string>("all");
+  const [slsFilter, setSlsFilter] = useState<string>("all");
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [totalCount, setTotalCount] = useState<number>(0);
+
+  // Dropdown options lists
+  const [distinctKecamatan, setDistinctKecamatan] = useState<string[]>([]);
+  const [distinctDesa, setDistinctDesa] = useState<string[]>([]);
+  const [distinctSls, setDistinctSls] = useState<string[]>([]);
+
+  // Statistics
+  const [stats, setStats] = useState({
+    total: 0,
+    rejected: 0,
+    pending: 0,
+    failed: 0,
+  });
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isScriptOpen, setIsScriptOpen] = useState(false);
+  const [itemsToReject, setItemsToReject] = useState<FasihRejectItem[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isExportingScript, setIsExportingScript] = useState(false);
 
-  // Load data dari Supabase
-  const fetchData = async () => {
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1); // Reset page on new search
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Fetch filter options (Kecamatan, Desa, SLS) secara dinamis
+  const fetchFilterOptions = useCallback(async () => {
+    try {
+      // 1. Ambil list kecamatan
+      const { data: kecData } = await supabase
+        .from("fasih_reject_items")
+        .select("kecamatan")
+        .not("kecamatan", "is", null);
+
+      if (kecData) {
+        const kecs = Array.from(new Set(kecData.map((d: any) => d.kecamatan).filter(Boolean))).sort() as string[];
+        setDistinctKecamatan(kecs);
+      }
+
+      // 2. Ambil list desa (bila kecamatan terpilih, batasi ke kecamatan tsb)
+      let desaQuery = supabase
+        .from("fasih_reject_items")
+        .select("desa")
+        .not("desa", "is", null);
+
+      if (kecamatanFilter !== "all") {
+        desaQuery = desaQuery.eq("kecamatan", kecamatanFilter);
+      }
+      const { data: desaData } = await desaQuery;
+      if (desaData) {
+        const desas = Array.from(new Set(desaData.map((d: any) => d.desa).filter(Boolean))).sort() as string[];
+        setDistinctDesa(desas);
+      }
+
+      // 3. Ambil list SLS (bila desa terpilih, batasi ke desa tsb)
+      let slsQuery = supabase
+        .from("fasih_reject_items")
+        .select("sls")
+        .not("sls", "is", null);
+
+      if (desaFilter !== "all") {
+        slsQuery = slsQuery.eq("desa", desaFilter);
+      } else if (kecamatanFilter !== "all") {
+        slsQuery = slsQuery.eq("kecamatan", kecamatanFilter);
+      }
+      const { data: slsData } = await slsQuery;
+      if (slsData) {
+        const slses = Array.from(new Set(slsData.map((d: any) => d.sls).filter(Boolean))).sort() as string[];
+        setDistinctSls(slses);
+      }
+    } catch (err) {
+      console.warn("Gagal mengambil options filter", err);
+    }
+  }, [kecamatanFilter, desaFilter]);
+
+  // Fetch statistik keseluruhan data
+  const fetchStats = useCallback(async () => {
+    try {
+      const { count: total } = await supabase
+        .from("fasih_reject_items")
+        .select("*", { count: "exact", head: true });
+
+      const { count: rejected } = await supabase
+        .from("fasih_reject_items")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "rejected");
+
+      const { count: pending } = await supabase
+        .from("fasih_reject_items")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+
+      const { count: failed } = await supabase
+        .from("fasih_reject_items")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "failed");
+
+      setStats({
+        total: total || 0,
+        rejected: rejected || 0,
+        pending: pending || 0,
+        failed: failed || 0,
+      });
+    } catch (err) {
+      console.warn("Gagal mengambil statistik", err);
+    }
+  }, []);
+
+  // Fetch tabel data dengan SERVER-SIDE PAGINATION & FILTER
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let query = supabase
         .from("fasih_reject_items")
-        .select("*")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false });
+
+      // Filter status
+      if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter);
+      }
+
+      // Filter Kecamatan
+      if (kecamatanFilter !== "all") {
+        query = query.eq("kecamatan", kecamatanFilter);
+      }
+
+      // Filter Desa
+      if (desaFilter !== "all") {
+        query = query.eq("desa", desaFilter);
+      }
+
+      // Filter SLS
+      if (slsFilter !== "all") {
+        query = query.eq("sls", slsFilter);
+      }
+
+      // Search query (ilike multi-column)
+      if (debouncedSearch.trim()) {
+        const q = `%${debouncedSearch.trim()}%`;
+        query = query.or(
+          `kecamatan.ilike.${q},desa.ilike.${q},sls.ilike.${q},idsls.ilike.${q},nama_usaha.ilike.${q},assignment_id.ilike.${q}`
+        );
+      }
+
+      // Server-side Range
+      const { data, count, error } = await query.range(from, to);
 
       if (error) {
         console.error("Gagal mengambil data fasih_reject_items:", error);
       } else {
         setItems(data || []);
+        setTotalCount(count || 0);
       }
     } catch (err) {
       console.error("Error fetchData:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, pageSize, statusFilter, kecamatanFilter, desaFilter, slsFilter, debouncedSearch]);
+
+  useEffect(() => {
+    fetchFilterOptions();
+  }, [fetchFilterOptions]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   useEffect(() => {
     fetchData();
+  }, [fetchData]);
 
-    // Setup Supabase Realtime Subscription agar live update saat script console FASIH berjalan
+  // Realtime subscription Supabase
+  useEffect(() => {
     const channel = supabase
       .channel("fasih_reject_realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "fasih_reject_items" },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            setItems((prev) => [payload.new as FasihRejectItem, ...prev]);
-          } else if (payload.eventType === "UPDATE") {
-            setItems((prev) =>
-              prev.map((it) => (it.id === payload.new.id ? (payload.new as FasihRejectItem) : it))
-            );
-          } else if (payload.eventType === "DELETE") {
-            setItems((prev) => prev.filter((it) => it.id === payload.old.id));
-          }
+        () => {
+          // Re-fetch current view & stats when changes occur
+          fetchData();
+          fetchStats();
         }
       )
       .subscribe();
@@ -65,61 +222,36 @@ export default function FasihRejectPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchData, fetchStats]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // List Kecamatan unik untuk dropdown filter
-  const distinctKecamatan = useMemo(() => {
-    const list = items
-      .map((it) => it.kecamatan)
-      .filter((k): k is string => Boolean(k && k.trim()));
-    return Array.from(new Set(list)).sort();
-  }, [items]);
+  // Reset pagination saat filter berubah
+  const handleKecamatanChange = (val: string) => {
+    setKecamatanFilter(val);
+    setDesaFilter("all");
+    setSlsFilter("all");
+    setCurrentPage(1);
+  };
 
-  // Data Terfilter
-  const filteredItems = useMemo(() => {
-    return items.filter((it) => {
-      // Filter status
-      if (statusFilter !== "all" && it.status !== statusFilter) return false;
+  const handleDesaChange = (val: string) => {
+    setDesaFilter(val);
+    setSlsFilter("all");
+    setCurrentPage(1);
+  };
 
-      // Filter kecamatan
-      if (kecamatanFilter !== "all" && it.kecamatan !== kecamatanFilter) return false;
-
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchKec = it.kecamatan?.toLowerCase().includes(q);
-        const matchDesa = it.desa?.toLowerCase().includes(q);
-        const matchSls = it.sls?.toLowerCase().includes(q);
-        const matchIdSls = it.idsls?.toLowerCase().includes(q);
-        const matchLink = it.link?.toLowerCase().includes(q);
-        const matchId = it.assignment_id?.toLowerCase().includes(q);
-        if (!matchKec && !matchDesa && !matchSls && !matchIdSls && !matchLink && !matchId) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [items, statusFilter, kecamatanFilter, searchQuery]);
-
-  // Statistik Kartu
-  const stats = useMemo(() => {
-    const total = items.length;
-    const rejected = items.filter((i) => i.status === "rejected").length;
-    const pending = items.filter((i) => i.status === "pending").length;
-    const failed = items.filter((i) => i.status === "failed").length;
-    return { total, rejected, pending, failed };
-  }, [items]);
+  const handleSlsChange = (val: string) => {
+    setSlsFilter(val);
+    setCurrentPage(1);
+  };
 
   // Checkbox handlers
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectAllCurrentPage = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedIds(filteredItems.map((it) => it.id));
+      setSelectedIds(items.map((it) => it.id));
     } else {
       setSelectedIds([]);
     }
@@ -131,11 +263,56 @@ export default function FasihRejectPage() {
     );
   };
 
-  const handleSelectOnlyPending = () => {
-    const pendingIds = filteredItems
+  const handleSelectOnlyPendingOnPage = () => {
+    const pendingIds = items
       .filter((it) => it.status === "pending")
       .map((it) => it.id);
     setSelectedIds(pendingIds);
+  };
+
+  // Eksekusi Reject: baris terpilih di halaman saat ini
+  const handleOpenScriptForSelected = () => {
+    const selected = items.filter((it) => selectedIds.includes(it.id));
+    setItemsToReject(selected);
+    setIsScriptOpen(true);
+  };
+
+  // Eksekusi Reject: Seluruh data sesuai filter aktif (hingga ribuan data)
+  const handleOpenScriptForAllFiltered = async () => {
+    try {
+      setIsExportingScript(true);
+      let query = supabase
+        .from("fasih_reject_items")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (statusFilter !== "all") query = query.eq("status", statusFilter);
+      if (kecamatanFilter !== "all") query = query.eq("kecamatan", kecamatanFilter);
+      if (desaFilter !== "all") query = query.eq("desa", desaFilter);
+      if (slsFilter !== "all") query = query.eq("sls", slsFilter);
+      if (debouncedSearch.trim()) {
+        const q = `%${debouncedSearch.trim()}%`;
+        query = query.or(
+          `kecamatan.ilike.${q},desa.ilike.${q},sls.ilike.${q},idsls.ilike.${q},nama_usaha.ilike.${q},assignment_id.ilike.${q}`
+        );
+      }
+
+      // Fetch all matching data without limit
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        alert("Tidak ada data penugasan yang sesuai dengan filter saat ini.");
+        return;
+      }
+
+      setItemsToReject(data);
+      setIsScriptOpen(true);
+    } catch (err: any) {
+      alert("Gagal memuat seluruh data filter: " + err.message);
+    } finally {
+      setIsExportingScript(false);
+    }
   };
 
   // Aksi Update Status Manual
@@ -162,6 +339,7 @@ export default function FasihRejectPage() {
       showToast(`Status ${selectedIds.length} item berhasil diubah menjadi "${newStatus}"!`);
       setSelectedIds([]);
       fetchData();
+      fetchStats();
     } catch (err: any) {
       alert("Gagal update status: " + err.message);
     }
@@ -185,15 +363,14 @@ export default function FasihRejectPage() {
       showToast(`${selectedIds.length} item berhasil dihapus.`);
       setSelectedIds([]);
       fetchData();
+      fetchStats();
     } catch (err: any) {
       alert("Gagal menghapus data: " + err.message);
     }
   };
 
-  // Item yang dipilih untuk di-reject
-  const selectedItemsToReject = useMemo(() => {
-    return items.filter((it) => selectedIds.includes(it.id));
-  }, [items, selectedIds]);
+  // Total pages
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return (
     <div className="space-y-6 p-4 md:p-6 max-w-7xl mx-auto">
@@ -213,7 +390,7 @@ export default function FasihRejectPage() {
               FASIH Bulk Reject Helper
             </h1>
             <span className="px-2 py-0.5 text-[10px] font-bold bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300 rounded-full">
-              Real-time Sync
+              Server Pagination
             </span>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -231,15 +408,32 @@ export default function FasihRejectPage() {
             <span>Upload Excel / CSV</span>
           </button>
 
+          {/* Tombol Reject Filtered (Semua) */}
+          <button
+            type="button"
+            disabled={isExportingScript || totalCount === 0}
+            onClick={handleOpenScriptForAllFiltered}
+            className="px-3.5 py-2 text-xs font-bold text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-950/60 hover:bg-brand-100 border border-brand-200 dark:border-brand-900/60 rounded-xl transition flex items-center gap-1.5"
+            title="Eksekusi semua data yang sesuai dengan filter saat ini"
+          >
+            <span>🚀</span>
+            <span>
+              {isExportingScript
+                ? "Memuat..."
+                : `Reject Semua Filter (${totalCount.toLocaleString()})`}
+            </span>
+          </button>
+
+          {/* Tombol Reject Terpilih */}
           <button
             type="button"
             disabled={selectedIds.length === 0}
-            onClick={() => setIsScriptOpen(true)}
+            onClick={handleOpenScriptForSelected}
             className="px-4 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl shadow-md transition flex items-center gap-2"
           >
             <span>⚡</span>
             <span>
-              Eksekusi Reject ({selectedIds.length})
+              Reject Terpilih ({selectedIds.length})
             </span>
           </button>
         </div>
@@ -250,7 +444,9 @@ export default function FasihRejectPage() {
         <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700 shadow-xs">
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Penugasan</p>
           <div className="flex items-baseline justify-between mt-2">
-            <span className="text-2xl font-bold text-gray-800 dark:text-white">{stats.total}</span>
+            <span className="text-2xl font-bold text-gray-800 dark:text-white">
+              {stats.total.toLocaleString()}
+            </span>
             <span className="text-xs text-gray-400">item</span>
           </div>
         </div>
@@ -261,7 +457,9 @@ export default function FasihRejectPage() {
             Berhasil Di-reject
           </p>
           <div className="flex items-baseline justify-between mt-2">
-            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.rejected}</span>
+            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+              {stats.rejected.toLocaleString()}
+            </span>
             <span className="text-xs text-emerald-500 font-medium">
               {stats.total > 0 ? `${((stats.rejected / stats.total) * 100).toFixed(0)}%` : "0%"}
             </span>
@@ -274,7 +472,9 @@ export default function FasihRejectPage() {
             Belum Di-reject (Pending)
           </p>
           <div className="flex items-baseline justify-between mt-2">
-            <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.pending}</span>
+            <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+              {stats.pending.toLocaleString()}
+            </span>
             <span className="text-xs text-amber-500 font-medium">siap eksekusi</span>
           </div>
         </div>
@@ -285,7 +485,9 @@ export default function FasihRejectPage() {
             Gagal / Error
           </p>
           <div className="flex items-baseline justify-between mt-2">
-            <span className="text-2xl font-bold text-rose-600 dark:text-rose-400">{stats.failed}</span>
+            <span className="text-2xl font-bold text-rose-600 dark:text-rose-400">
+              {stats.failed.toLocaleString()}
+            </span>
             <span className="text-xs text-rose-500 font-medium">periksa log</span>
           </div>
         </div>
@@ -293,15 +495,15 @@ export default function FasihRejectPage() {
 
       {/* Filter & Toolbar */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700 p-4 space-y-4 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search Bar */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 min-w-[240px]">
             <input
               type="text"
-              placeholder="Cari Kecamatan, Desa, SLS, atau Assignment ID..."
+              placeholder="Cari Kecamatan, Desa, SLS, Nama Usaha, IDSLS..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:border-brand-500"
+              className="w-full pl-9 pr-8 py-2 text-xs rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:border-brand-500"
             />
             <span className="absolute left-3 top-2.5 text-gray-400 text-xs">🔍</span>
             {searchQuery && (
@@ -314,23 +516,28 @@ export default function FasihRejectPage() {
             )}
           </div>
 
-          {/* Filters */}
+          {/* Filters: Status, Kecamatan, Desa, SLS */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Status */}
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="text-xs px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:border-brand-500"
             >
               <option value="all">Semua Status</option>
-              <option value="pending">🟡 Pending (Belum di-reject)</option>
-              <option value="rejected">🟢 Rejected (Berhasil)</option>
-              <option value="failed">🔴 Failed (Gagal)</option>
+              <option value="pending">🟡 Pending</option>
+              <option value="rejected">🟢 Rejected</option>
+              <option value="failed">🔴 Failed</option>
             </select>
 
+            {/* Kecamatan */}
             <select
               value={kecamatanFilter}
-              onChange={(e) => setKecamatanFilter(e.target.value)}
-              className="text-xs px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:border-brand-500"
+              onChange={(e) => handleKecamatanChange(e.target.value)}
+              className="text-xs px-3 py-2 max-w-[160px] rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:border-brand-500"
             >
               <option value="all">Semua Kecamatan</option>
               {distinctKecamatan.map((kec) => (
@@ -340,9 +547,40 @@ export default function FasihRejectPage() {
               ))}
             </select>
 
+            {/* Desa */}
+            <select
+              value={desaFilter}
+              onChange={(e) => handleDesaChange(e.target.value)}
+              className="text-xs px-3 py-2 max-w-[160px] rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:border-brand-500"
+            >
+              <option value="all">Semua Desa</option>
+              {distinctDesa.map((desa) => (
+                <option key={desa} value={desa}>
+                  {desa}
+                </option>
+              ))}
+            </select>
+
+            {/* SLS */}
+            <select
+              value={slsFilter}
+              onChange={(e) => handleSlsChange(e.target.value)}
+              className="text-xs px-3 py-2 max-w-[160px] rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:border-brand-500"
+            >
+              <option value="all">Semua SLS</option>
+              {distinctSls.map((sls) => (
+                <option key={sls} value={sls}>
+                  {sls}
+                </option>
+              ))}
+            </select>
+
             <button
               type="button"
-              onClick={fetchData}
+              onClick={() => {
+                fetchData();
+                fetchStats();
+              }}
               title="Refresh Data"
               className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition border border-gray-200 dark:border-gray-700"
             >
@@ -355,17 +593,15 @@ export default function FasihRejectPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/60 text-xs">
           <div className="flex items-center gap-2">
             <span className="text-gray-500 dark:text-gray-400">
-              Terpilih: <strong>{selectedIds.length}</strong> dari {filteredItems.length} baris
+              Terpilih di halaman ini: <strong>{selectedIds.length}</strong> dari {items.length} baris
             </span>
-            {stats.pending > 0 && (
-              <button
-                type="button"
-                onClick={handleSelectOnlyPending}
-                className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline font-medium ml-2"
-              >
-                Pilih Semua yang Pending
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleSelectOnlyPendingOnPage}
+              className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline font-medium ml-2"
+            >
+              Pilih Semua Pending di Halaman Ini
+            </button>
           </div>
 
           {selectedIds.length > 0 && (
@@ -406,16 +642,16 @@ export default function FasihRejectPage() {
                   <input
                     type="checkbox"
                     checked={
-                      filteredItems.length > 0 &&
-                      filteredItems.every((it) => selectedIds.includes(it.id))
+                      items.length > 0 && items.every((it) => selectedIds.includes(it.id))
                     }
-                    onChange={handleSelectAll}
+                    onChange={handleSelectAllCurrentPage}
                     className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
                   />
                 </th>
                 <th className="p-3.5">Kecamatan</th>
                 <th className="p-3.5">Desa</th>
                 <th className="p-3.5">SLS / IDSLS</th>
+                <th className="p-3.5">Nama Usaha</th>
                 <th className="p-3.5">Link Penugasan FASIH</th>
                 <th className="p-3.5">Status</th>
                 <th className="p-3.5">Keterangan / Waktu</th>
@@ -425,25 +661,25 @@ export default function FasihRejectPage() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-gray-400">
+                  <td colSpan={9} className="p-8 text-center text-gray-400">
                     <div className="inline-block animate-spin h-6 w-6 border-2 border-brand-500 border-t-transparent rounded-full mb-2"></div>
                     <p>Memuat data daftar reject...</p>
                   </td>
                 </tr>
-              ) : filteredItems.length === 0 ? (
+              ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center">
+                  <td colSpan={9} className="p-10 text-center">
                     <div className="text-3xl mb-2">📂</div>
                     <p className="font-semibold text-gray-700 dark:text-gray-300">
-                      Belum ada data penugasan reject
+                      Tidak ada data penugasan yang sesuai
                     </p>
                     <p className="text-gray-400 text-[11px] mt-1">
-                      Klik tombol "Upload Excel / CSV" untuk menambahkan daftar link penugasan baru.
+                      Coba ubah kata kunci pencarian atau sesuaikan pilihan filter di atas.
                     </p>
                   </td>
                 </tr>
               ) : (
-                filteredItems.map((row) => {
+                items.map((row) => {
                   const isChecked = selectedIds.includes(row.id);
                   return (
                     <tr
@@ -469,6 +705,9 @@ export default function FasihRejectPage() {
                       <td className="p-3.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">
                         <div>{row.sls || "-"}</div>
                         <div className="text-[10px] text-gray-400 font-mono">{row.idsls || ""}</div>
+                      </td>
+                      <td className="p-3.5 font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap max-w-[200px] truncate">
+                        {row.nama_usaha || "-"}
                       </td>
                       <td className="p-3.5 max-w-xs truncate">
                         <a
@@ -534,6 +773,7 @@ export default function FasihRejectPage() {
                                   })
                                   .eq("id", row.id);
                                 fetchData();
+                                fetchStats();
                               }}
                               title="Tandai Sudah Di-reject"
                               className="p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950 rounded-md transition"
@@ -553,6 +793,7 @@ export default function FasihRejectPage() {
                                   })
                                   .eq("id", row.id);
                                 fetchData();
+                                fetchStats();
                               }}
                               title="Reset ke Pending"
                               className="p-1 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950 rounded-md transition"
@@ -569,6 +810,7 @@ export default function FasihRejectPage() {
                                   .delete()
                                   .eq("id", row.id);
                                 fetchData();
+                                fetchStats();
                               }
                             }}
                             title="Hapus"
@@ -585,6 +827,81 @@ export default function FasihRejectPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+            <span>
+              Menampilkan{" "}
+              <strong>
+                {totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1} -{" "}
+                {Math.min(currentPage * pageSize, totalCount)}
+              </strong>{" "}
+              dari <strong>{totalCount.toLocaleString()}</strong> data
+            </span>
+
+            <div className="flex items-center gap-1.5 ml-2">
+              <span>Per baris:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+                <option value={500}>500</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Page Controls */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={currentPage <= 1 || loading}
+              onClick={() => setCurrentPage(1)}
+              className="px-2.5 py-1 text-xs rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+              title="Halaman Pertama"
+            >
+              «
+            </button>
+            <button
+              type="button"
+              disabled={currentPage <= 1 || loading}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="px-3 py-1 text-xs rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            >
+              Prev
+            </button>
+
+            <span className="px-3 py-1 text-xs font-semibold text-brand-600 dark:text-brand-400">
+              {currentPage} / {totalPages}
+            </span>
+
+            <button
+              type="button"
+              disabled={currentPage >= totalPages || loading}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="px-3 py-1 text-xs rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            >
+              Next
+            </button>
+            <button
+              type="button"
+              disabled={currentPage >= totalPages || loading}
+              onClick={() => setCurrentPage(totalPages)}
+              className="px-2.5 py-1 text-xs rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+              title="Halaman Terakhir"
+            >
+              »
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Modals */}
@@ -594,13 +911,15 @@ export default function FasihRejectPage() {
         onSuccess={() => {
           showToast("Data Excel/CSV berhasil diimpor ke Supabase!");
           fetchData();
+          fetchStats();
+          fetchFilterOptions();
         }}
       />
 
       <RejectScriptModal
         isOpen={isScriptOpen}
         onClose={() => setIsScriptOpen(false)}
-        selectedItems={selectedItemsToReject}
+        selectedItems={itemsToReject}
         onManualMarkSuccess={() => {
           handleBulkUpdateStatus("rejected");
           setIsScriptOpen(false);

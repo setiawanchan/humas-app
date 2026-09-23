@@ -16,6 +16,7 @@ interface ParsedRow {
   desa: string;
   sls: string;
   idsls: string;
+  nama_usaha: string;
   link: string;
   assignment_id: string;
 }
@@ -66,6 +67,12 @@ export default function RejectUploadModal({
           const kDesa = findKey("desa");
           const kSls = findKey("sls");
           const kIdSls = findKey("idsls") || findKey("id_sls") || findKey("id sls");
+          const kUsaha =
+            findKey("nama usaha") ||
+            findKey("nama_usaha") ||
+            findKey("nama_perusahaan") ||
+            findKey("usaha") ||
+            findKey("perusahaan");
           const kLink =
             findKey("link") ||
             findKey("url") ||
@@ -80,6 +87,7 @@ export default function RejectUploadModal({
             desa: String(row[kDesa] || "").trim(),
             sls: String(row[kSls] || "").trim(),
             idsls: String(row[kIdSls] || "").trim(),
+            nama_usaha: String(row[kUsaha] || "").trim(),
             link: linkVal,
             assignment_id: extractAssignmentId(linkVal),
           });
@@ -109,6 +117,7 @@ export default function RejectUploadModal({
         Desa: "001 - BUMI RESTU",
         SLS: "RT 001 RW 001",
         IDSLS: "18040100010001",
+        "Nama Usaha": "TOKO BERKAH JAYA",
         Link: "https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/0e11feb6-f933-45d4-b0c6-7d15fc0a1104",
       },
       {
@@ -116,6 +125,7 @@ export default function RejectUploadModal({
         Desa: "002 - BUMI HARJO",
         SLS: "RT 002 RW 001",
         IDSLS: "18040100020002",
+        "Nama Usaha": "UD MAJU MAPAN",
         Link: "https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/147cb6a4-cac2-40ae-8a92-ecd4c377587c",
       },
     ];
@@ -137,6 +147,7 @@ export default function RejectUploadModal({
         desa: d.desa || null,
         sls: d.sls || null,
         idsls: d.idsls || null,
+        nama_usaha: d.nama_usaha || null,
         link: d.link,
         assignment_id: d.assignment_id || null,
         status: "pending",
@@ -168,7 +179,7 @@ export default function RejectUploadModal({
               Upload Daftar Reject (Excel / CSV)
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              File harus memuat kolom: <span className="font-semibold text-brand-500">Kecamatan, Desa, SLS, IDSLS, Link</span>
+              File dapat memuat kolom: <span className="font-semibold text-brand-500">Kecamatan, Desa, SLS, IDSLS, Nama Usaha, Link</span>
             </p>
           </div>
           <button
@@ -231,6 +242,7 @@ export default function RejectUploadModal({
                       <th className="p-2">Kecamatan</th>
                       <th className="p-2">Desa</th>
                       <th className="p-2">SLS / IDSLS</th>
+                      <th className="p-2">Nama Usaha</th>
                       <th className="p-2">Assignment ID</th>
                     </tr>
                   </thead>
@@ -241,6 +253,9 @@ export default function RejectUploadModal({
                         <td className="p-2 text-gray-800 dark:text-gray-200">{row.desa || "-"}</td>
                         <td className="p-2 text-gray-600 dark:text-gray-400">
                           {row.sls} <span className="text-[10px] text-gray-400">({row.idsls})</span>
+                        </td>
+                        <td className="p-2 font-medium text-gray-800 dark:text-gray-200">
+                          {row.nama_usaha || "-"}
                         </td>
                         <td className="p-2 font-mono text-[11px] text-brand-600 dark:text-brand-400">
                           {row.assignment_id || "N/A"}

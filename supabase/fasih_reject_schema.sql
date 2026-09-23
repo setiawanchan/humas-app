@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.fasih_reject_items (
     desa TEXT,
     sls TEXT,
     idsls TEXT,
+    nama_usaha TEXT,
     link TEXT NOT NULL,
     assignment_id TEXT,
     status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'rejected', 'failed'
@@ -18,9 +19,17 @@ CREATE TABLE IF NOT EXISTS public.fasih_reject_items (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ==============================================================
+-- JIKA TABEL SUDAH ADA, JALANKAN ALTER TABLE DI BAWAH INI:
+-- ==============================================================
+ALTER TABLE public.fasih_reject_items ADD COLUMN IF NOT EXISTS nama_usaha TEXT;
+
 -- Index untuk performa query dan pencarian
 CREATE INDEX IF NOT EXISTS idx_fasih_reject_status ON public.fasih_reject_items(status);
 CREATE INDEX IF NOT EXISTS idx_fasih_reject_assignment_id ON public.fasih_reject_items(assignment_id);
+CREATE INDEX IF NOT EXISTS idx_fasih_reject_kecamatan ON public.fasih_reject_items(kecamatan);
+CREATE INDEX IF NOT EXISTS idx_fasih_reject_desa ON public.fasih_reject_items(desa);
+CREATE INDEX IF NOT EXISTS idx_fasih_reject_sls ON public.fasih_reject_items(sls);
 CREATE INDEX IF NOT EXISTS idx_fasih_reject_created_at ON public.fasih_reject_items(created_at DESC);
 
 -- Enable Row Level Security (RLS)
