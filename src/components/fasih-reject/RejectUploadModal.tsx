@@ -142,22 +142,39 @@ export default function RejectUploadModal({
     setErrorMessage("");
 
     try {
-      const payload = parsedData.map((d) => ({
-        kecamatan: d.kecamatan || null,
-        desa: d.desa || null,
-        sls: d.sls || null,
-        idsls: d.idsls || null,
-        nama_usaha: d.nama_usaha || null,
-        link: d.link,
-        assignment_id: d.assignment_id || null,
-        status: "pending",
-      }));
+      // Hilangkan duplikat internal dalam file upload terlebih dahulu (ambil yang paling akhir)
+      const uniqueMap = new Map<string, any>();
+      for (const d of parsedData) {
+        const key = d.assignment_id || d.link;
+        uniqueMap.set(key, {
+          kecamatan: d.kecamatan || null,
+          desa: d.desa || null,
+          sls: d.sls || null,
+          idsls: d.idsls || null,
+          nama_usaha: d.nama_usaha || null,
+          link: d.link,
+          assignment_id: d.assignment_id || null,
+          status: "pending",
+          updated_at: new Date().toISOString(),
+        });
+      }
 
-      // Insert ke Supabase
-      const { error } = await supabase.from("fasih_reject_items").insert(payload);
+      const payload = Array.from(uniqueMap.values());
 
-      if (error) {
-        throw new Error(error.message);
+      // Kirim dalam batch (chunk 500) agar Supabase REST API tidak overload saat mengunggah ribuan data
+      const CHUNK_SIZE = 500;
+      for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
+        const chunk = payload.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase
+          .from("fasih_reject_items")
+          .upsert(chunk, {
+            onConflict: "assignment_id",
+            ignoreDuplicates: false, // false = timpa/update jika sudah ada
+          });
+
+        if (error) {
+          throw new Error(error.message);
+        }
       }
 
       onSuccess();

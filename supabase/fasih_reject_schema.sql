@@ -20,17 +20,24 @@ CREATE TABLE IF NOT EXISTS public.fasih_reject_items (
 );
 
 -- ==============================================================
--- JIKA TABEL SUDAH ADA, JALANKAN ALTER TABLE DI BAWAH INI:
+-- 1. UNTUK MENGHAPUS SELURUH BARIS DATA (RESET/KOSONGKAN TABEL):
+-- Jalankan query ini di SQL Editor jika ingin membersihkan seluruh data:
 -- ==============================================================
-ALTER TABLE public.fasih_reject_items ADD COLUMN IF NOT EXISTS nama_usaha TEXT;
+-- TRUNCATE TABLE public.fasih_reject_items;
 
--- Index untuk performa query dan pencarian
-CREATE INDEX IF NOT EXISTS idx_fasih_reject_status ON public.fasih_reject_items(status);
-CREATE INDEX IF NOT EXISTS idx_fasih_reject_assignment_id ON public.fasih_reject_items(assignment_id);
-CREATE INDEX IF NOT EXISTS idx_fasih_reject_kecamatan ON public.fasih_reject_items(kecamatan);
-CREATE INDEX IF NOT EXISTS idx_fasih_reject_desa ON public.fasih_reject_items(desa);
-CREATE INDEX IF NOT EXISTS idx_fasih_reject_sls ON public.fasih_reject_items(sls);
-CREATE INDEX IF NOT EXISTS idx_fasih_reject_created_at ON public.fasih_reject_items(created_at DESC);
+-- ==============================================================
+-- 2. JADIKAN assignment_id SEBAGAI UNIQUE KEY AGAR BISA MENIMPA (UPSERT):
+-- ==============================================================
+-- Pertama, hapus duplikat yang mungkin sudah ada sebelum menambahkan constraint:
+DELETE FROM public.fasih_reject_items a
+USING public.fasih_reject_items b
+WHERE a.id > b.id 
+  AND a.assignment_id = b.assignment_id 
+  AND a.assignment_id IS NOT NULL;
+
+-- Tambahkan UNIQUE constraint pada assignment_id
+ALTER TABLE public.fasih_reject_items 
+ADD CONSTRAINT fasih_reject_items_assignment_id_key UNIQUE (assignment_id);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.fasih_reject_items ENABLE ROW LEVEL SECURITY;
