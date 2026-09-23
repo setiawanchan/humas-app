@@ -447,9 +447,20 @@ export default function FasihRejectPage() {
         </div>
       </div>
 
-      {/* Cards Statistik */}
+      {/* Cards Statistik (Bisa Diklik untuk Filter Cepat) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700 shadow-xs">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter("all");
+            setCurrentPage(1);
+          }}
+          className={`p-4 text-left rounded-2xl border transition shadow-xs cursor-pointer ${
+            statusFilter === "all"
+              ? "bg-brand-50/50 dark:bg-brand-950/40 border-brand-500 ring-2 ring-brand-500/20"
+              : "bg-white dark:bg-gray-800 border-gray-200/80 dark:border-gray-700 hover:border-brand-300"
+          }`}
+        >
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Penugasan</p>
           <div className="flex items-baseline justify-between mt-2">
             <span className="text-2xl font-bold text-gray-800 dark:text-white">
@@ -457,9 +468,20 @@ export default function FasihRejectPage() {
             </span>
             <span className="text-xs text-gray-400">item</span>
           </div>
-        </div>
+        </button>
 
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-emerald-200 dark:border-emerald-900/50 shadow-xs">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter(statusFilter === "rejected" ? "all" : "rejected");
+            setCurrentPage(1);
+          }}
+          className={`p-4 text-left rounded-2xl border transition shadow-xs cursor-pointer ${
+            statusFilter === "rejected"
+              ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/20"
+              : "bg-white dark:bg-gray-800 border-emerald-200 dark:border-emerald-900/50 hover:border-emerald-400"
+          }`}
+        >
           <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
             Berhasil Di-reject
@@ -472,9 +494,20 @@ export default function FasihRejectPage() {
               {stats.total > 0 ? `${((stats.rejected / stats.total) * 100).toFixed(0)}%` : "0%"}
             </span>
           </div>
-        </div>
+        </button>
 
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-amber-200 dark:border-amber-900/50 shadow-xs">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter(statusFilter === "pending" ? "all" : "pending");
+            setCurrentPage(1);
+          }}
+          className={`p-4 text-left rounded-2xl border transition shadow-xs cursor-pointer ${
+            statusFilter === "pending"
+              ? "bg-amber-50 dark:bg-amber-950/60 border-amber-500 ring-2 ring-amber-500/20"
+              : "bg-white dark:bg-gray-800 border-amber-200 dark:border-amber-900/50 hover:border-amber-400"
+          }`}
+        >
           <p className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
             Belum Di-reject (Pending)
@@ -485,9 +518,20 @@ export default function FasihRejectPage() {
             </span>
             <span className="text-xs text-amber-500 font-medium">siap eksekusi</span>
           </div>
-        </div>
+        </button>
 
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-rose-200 dark:border-rose-900/50 shadow-xs">
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter(statusFilter === "failed" ? "all" : "failed");
+            setCurrentPage(1);
+          }}
+          className={`p-4 text-left rounded-2xl border transition shadow-xs cursor-pointer ${
+            statusFilter === "failed"
+              ? "bg-rose-50 dark:bg-rose-950/60 border-rose-500 ring-2 ring-rose-500/20"
+              : "bg-white dark:bg-gray-800 border-rose-200 dark:border-rose-900/50 hover:border-rose-400"
+          }`}
+        >
           <p className="text-xs font-medium text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
             Gagal / Error
@@ -498,11 +542,90 @@ export default function FasihRejectPage() {
             </span>
             <span className="text-xs text-rose-500 font-medium">periksa log</span>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Filter & Toolbar */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200/80 dark:border-gray-700 p-4 space-y-4 shadow-xs">
+        {/* Quick Filter Pills Status */}
+        <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-gray-100 dark:border-gray-700/60">
+          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 mr-1">
+            Status:
+          </span>
+
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter("all");
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+              statusFilter === "all"
+                ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-xs"
+                : "bg-gray-100 text-gray-600 dark:bg-gray-750 dark:text-gray-300 hover:bg-gray-200"
+            }`}
+          >
+            <span>Semua Data</span>
+            <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-black/10 dark:bg-white/20">
+              {stats.total.toLocaleString()}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter("pending");
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+              statusFilter === "pending"
+                ? "bg-amber-500 text-white shadow-xs"
+                : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 hover:bg-amber-100 border border-amber-200 dark:border-amber-900/50"
+            }`}
+          >
+            <span>🟡 Belum Di-reject (Pending)</span>
+            <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-amber-600/20 text-current">
+              {stats.pending.toLocaleString()}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter("rejected");
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+              statusFilter === "rejected"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-900/50"
+            }`}
+          >
+            <span>🟢 Sudah Di-reject</span>
+            <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-emerald-600/20 text-current">
+              {stats.rejected.toLocaleString()}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter("failed");
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+              statusFilter === "failed"
+                ? "bg-rose-600 text-white shadow-xs"
+                : "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/50"
+            }`}
+          >
+            <span>🔴 Gagal / Error</span>
+            <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-rose-600/20 text-current">
+              {stats.failed.toLocaleString()}
+            </span>
+          </button>
+        </div>
+
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search Bar */}
           <div className="relative flex-1 min-w-[240px]">
@@ -524,22 +647,8 @@ export default function FasihRejectPage() {
             )}
           </div>
 
-          {/* Filters: Status, Kecamatan, Desa, SLS */}
+          {/* Filters: Kecamatan, Desa, SLS */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Status */}
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="text-xs px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:border-brand-500"
-            >
-              <option value="all">Semua Status</option>
-              <option value="pending">🟡 Pending</option>
-              <option value="rejected">🟢 Rejected</option>
-              <option value="failed">🔴 Failed</option>
-            </select>
 
             {/* Kecamatan */}
             <select
