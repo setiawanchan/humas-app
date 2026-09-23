@@ -61,6 +61,12 @@ export default function AppSidebar() {
       rolesAllowed: ["administrator", "admin_humas", "pegawai"],
     },
     {
+      name: "FASIH Reject",
+      icon: <ListIcon />,
+      path: "/fasih-reject",
+      rolesAllowed: ["administrator", "admin_humas", "pegawai"],
+    },
+    {
       name: "Admin",
       icon: <UserCircleIcon />,
       rolesAllowed: ["administrator"],

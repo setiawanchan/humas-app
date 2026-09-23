@@ -1,0 +1,24 @@
+# Masukkan daftar link penugasan yang akan di-reject di bawah ini (satu link per baris).
+# Baris yang diawali dengan tanda # akan diabaikan oleh bot.
+
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/0e11feb6-f933-45d4-b0c6-7d15fc0a1104
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/0e11feb6-f933-45d4-b0c6-7d15fc0a1104
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/147cb6a4-cac2-40ae-8a92-ecd4c377587c
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/147cb6a4-cac2-40ae-8a92-ecd4c377587c
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/1dbc5ba5-10c3-4623-86ee-41dc06c31a11
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/2c9561b4-6701-4652-9b85-ba2984ba5f54
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/4231ebd8-fdbf-4186-94c4-4917ab5ee710
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/5b261e84-c067-415a-b039-82a8e4c3df48
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/8ec584d7-8f23-4085-aa59-a4f3f0901b4a
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/94197bba-5027-4127-b33a-42fba6d28c7b
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/ad08cdb9-9eb0-46bd-9a7a-340874d52890
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/b0973731-4cd7-4bc5-8555-f439840075e8
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/b4763f86-5277-4855-9d2e-2e5e062793f7
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/b6aebd67-0667-4476-a7ea-d84ce888cf75
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/b8af1120-c315-495b-919e-11a320b867c6
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/b8af1120-c315-495b-919e-11a320b867c6
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/b8af1120-c315-495b-919e-11a320b867c6
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/c9cdc0de-ba57-42de-a2d1-acecac4732a5
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/ccd872e8-b361-42ee-85e3-1b533cd74330
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/f0d74cd9-8520-4d27-8def-2f22f21425bb
+https://fasih-sm.bps.go.id/app/assignment/fd68e454-ba45-4b85-8205-f3bf777ded24/f60719bb-48b0-409f-92f3-0e11cfd35704
