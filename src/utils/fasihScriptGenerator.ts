@@ -8,7 +8,9 @@ import { FasihRejectItem } from "@/types/fasih-reject";
 export function generateBulkRejectScript(
   items: FasihRejectItem[],
   supabaseUrl: string,
-  supabaseAnonKey: string
+  supabaseAnonKey: string,
+  delayMin: number = 2500,
+  delayMax: number = 4500
 ): string {
   const itemsJson = JSON.stringify(
     items.map((it) => ({
@@ -152,8 +154,10 @@ export function generateBulkRejectScript(
       await updateSupabaseStatus(item.id, 'failed', 'Error Jaringan: ' + err.message);
     }
 
-    // Delay 1 detik antar request agar tidak membebani server
-    await sleep(1000);
+    // Delay acak antar request (human-like jitter) agar tidak terdeteksi sebagai bot
+    const randomDelay = Math.floor(Math.random() * (${delayMax} - ${delayMin} + 1)) + ${delayMin};
+    console.log("%c  [⏳] Menunggu " + (randomDelay / 1000).toFixed(1) + " detik sebelum item berikutnya...", "color: #64748b; font-style: italic;");
+    await sleep(randomDelay);
   }
 
   console.log("%c==================================================", "color: #38bdf8; font-weight: bold;");
