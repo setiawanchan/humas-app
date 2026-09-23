@@ -70,3 +70,58 @@ ON public.fasih_reject_items
 FOR DELETE 
 TO anon, authenticated 
 USING (true);
+
+-- ==============================================================
+-- 3. FUNCTION RPC UNTUK MENDAPATKAN DAFTAR KECAMATAN, DESA, SLS (DISTINCT MURNI)
+-- Mengembalikan seluruh nama desa dan SLS tanpa terpotong limit 1.000 baris!
+-- ==============================================================
+CREATE OR REPLACE FUNCTION public.get_fasih_filter_options(
+    target_kecamatan TEXT DEFAULT NULL,
+    target_desa TEXT DEFAULT NULL
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    kec_list JSON;
+    desa_list JSON;
+    sls_list JSON;
+BEGIN
+    -- List Kecamatan unik
+    SELECT json_agg(k) INTO kec_list
+    FROM (
+        SELECT DISTINCT kecamatan 
+        FROM public.fasih_reject_items 
+        WHERE kecamatan IS NOT NULL AND kecamatan != ''
+        ORDER BY kecamatan ASC
+    ) sub(k);
+
+    -- List Desa unik (terfilter sesuai kecamatan jika ada)
+    SELECT json_agg(d) INTO desa_list
+    FROM (
+        SELECT DISTINCT desa 
+        FROM public.fasih_reject_items 
+        WHERE desa IS NOT NULL AND desa != ''
+          AND (target_kecamatan IS NULL OR target_kecamatan = 'all' OR kecamatan = target_kecamatan)
+        ORDER BY desa ASC
+    ) sub(d);
+
+    -- List SLS unik (terfilter sesuai desa/kecamatan jika ada)
+    SELECT json_agg(s) INTO sls_list
+    FROM (
+        SELECT DISTINCT sls 
+        FROM public.fasih_reject_items 
+        WHERE sls IS NOT NULL AND sls != ''
+          AND (target_kecamatan IS NULL OR target_kecamatan = 'all' OR kecamatan = target_kecamatan)
+          AND (target_desa IS NULL OR target_desa = 'all' OR desa = target_desa)
+        ORDER BY sls ASC
+    ) sub(s);
+
+    RETURN json_build_object(
+        'kecamatan', COALESCE(kec_list, '[]'::json),
+        'desa', COALESCE(desa_list, '[]'::json),
+        'sls', COALESCE(sls_list, '[]'::json)
+    );
+END;
+$$;

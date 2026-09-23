@@ -52,51 +52,59 @@ export default function FasihRejectPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch filter options (Kecamatan, Desa, SLS) secara dinamis
+  // Fetch filter options (Kecamatan, Desa, SLS) secara dinamis & lengkap tanpa batas 1.000
   const fetchFilterOptions = useCallback(async () => {
     try {
-      // 1. Ambil list kecamatan
-      const { data: kecData } = await supabase
-        .from("fasih_reject_items")
-        .select("kecamatan")
-        .not("kecamatan", "is", null);
+      // Prioritas 1: Panggil RPC function jika sudah dibuat di Supabase
+      const { data: rpcData, error: rpcError } = await supabase.rpc("get_fasih_filter_options", {
+        target_kecamatan: kecamatanFilter === "all" ? null : kecamatanFilter,
+        target_desa: desaFilter === "all" ? null : desaFilter,
+      });
 
-      if (kecData) {
-        const kecs = Array.from(new Set(kecData.map((d: any) => d.kecamatan).filter(Boolean))).sort() as string[];
-        setDistinctKecamatan(kecs);
+      if (!rpcError && rpcData) {
+        if (rpcData.kecamatan) setDistinctKecamatan(rpcData.kecamatan);
+        if (rpcData.desa) setDistinctDesa(rpcData.desa);
+        if (rpcData.sls) setDistinctSls(rpcData.sls);
+        return;
       }
 
-      // 2. Ambil list desa (bila kecamatan terpilih, batasi ke kecamatan tsb)
-      let desaQuery = supabase
-        .from("fasih_reject_items")
-        .select("desa")
-        .not("desa", "is", null);
+      // Fallback (jika user belum sempat menjalankan script SQL RPC):
+      // Ambil data dalam batch pagination range hingga seluruh nama desa/SLS terkumpul
+      const allRows: any[] = [];
+      const BATCH = 1000;
+      let from = 0;
+      let hasMore = true;
 
-      if (kecamatanFilter !== "all") {
-        desaQuery = desaQuery.eq("kecamatan", kecamatanFilter);
-      }
-      const { data: desaData } = await desaQuery;
-      if (desaData) {
-        const desas = Array.from(new Set(desaData.map((d: any) => d.desa).filter(Boolean))).sort() as string[];
-        setDistinctDesa(desas);
+      while (hasMore && from < 15000) {
+        let q = supabase
+          .from("fasih_reject_items")
+          .select("kecamatan, desa, sls")
+          .range(from, from + BATCH - 1);
+
+        if (kecamatanFilter !== "all") {
+          q = q.eq("kecamatan", kecamatanFilter);
+        }
+        if (desaFilter !== "all") {
+          q = q.eq("desa", desaFilter);
+        }
+
+        const { data: chunk, error } = await q;
+        if (error || !chunk || chunk.length === 0) {
+          hasMore = false;
+        } else {
+          allRows.push(...chunk);
+          if (chunk.length < BATCH) hasMore = false;
+          else from += BATCH;
+        }
       }
 
-      // 3. Ambil list SLS (bila desa terpilih, batasi ke desa tsb)
-      let slsQuery = supabase
-        .from("fasih_reject_items")
-        .select("sls")
-        .not("sls", "is", null);
+      const kecs = Array.from(new Set(allRows.map((d) => d.kecamatan).filter(Boolean))).sort() as string[];
+      const desas = Array.from(new Set(allRows.map((d) => d.desa).filter(Boolean))).sort() as string[];
+      const slses = Array.from(new Set(allRows.map((d) => d.sls).filter(Boolean))).sort() as string[];
 
-      if (desaFilter !== "all") {
-        slsQuery = slsQuery.eq("desa", desaFilter);
-      } else if (kecamatanFilter !== "all") {
-        slsQuery = slsQuery.eq("kecamatan", kecamatanFilter);
-      }
-      const { data: slsData } = await slsQuery;
-      if (slsData) {
-        const slses = Array.from(new Set(slsData.map((d: any) => d.sls).filter(Boolean))).sort() as string[];
-        setDistinctSls(slses);
-      }
+      if (kecs.length > 0) setDistinctKecamatan(kecs);
+      setDistinctDesa(desas);
+      setDistinctSls(slses);
     } catch (err) {
       console.warn("Gagal mengambil options filter", err);
     }
