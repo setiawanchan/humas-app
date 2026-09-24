@@ -23,6 +23,7 @@ export default function RejectScriptModal({
   // normal: 2.5 - 4.5 detik (Direkomendasikan)
   // fast: 1.5 - 2.5 detik (Cepat)
   const [speedProfile, setSpeedProfile] = useState<"safe" | "normal" | "fast">("normal");
+  const [isDirectReject, setIsDirectReject] = useState<boolean>(true);
 
   if (!isOpen) return null;
 
@@ -44,7 +45,8 @@ export default function RejectScriptModal({
     supabaseUrl,
     supabaseAnonKey,
     delayMin,
-    delayMax
+    delayMax,
+    isDirectReject
   );
 
   const handleCopy = async () => {
@@ -131,6 +133,56 @@ export default function RejectScriptModal({
               <p className="text-[11px] text-gray-500 dark:text-gray-400">
                 Paste kode di bawah ini lalu tekan <kbd className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-[10px]">Enter</kbd>. Status di web ini otomatis ter-update live!
               </p>
+            </div>
+          </div>
+
+          {/* Mode Penolakan (Direct Reject vs Reject Biasa) */}
+          <div className="p-3.5 bg-blue-50/70 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-900/60 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                <span>🎯</span>
+                <span>Mode Penolakan FASIH:</span>
+              </span>
+              <span className="text-[11px] font-semibold text-brand-600 dark:text-brand-400">
+                {isDirectReject ? "⚡ Direct Reject (Aktif)" : "📋 Reject Biasa (Standar)"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDirectReject(true)}
+                className={`py-2 px-3 text-xs rounded-lg font-medium border text-left transition flex items-center justify-between ${
+                  isDirectReject
+                    ? "bg-brand-600 text-white border-brand-600 shadow-xs"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-brand-500"
+                }`}
+              >
+                <div>
+                  <div className="font-bold flex items-center gap-1">
+                    <span>⚡ Direct Reject</span>
+                    <span className="text-[9px] px-1.5 py-0.2 bg-white/20 dark:bg-white/10 rounded font-normal">Baru</span>
+                  </div>
+                  <div className="text-[10px] opacity-80 mt-0.5">Langsung direct reject tanpa tahapan perantara</div>
+                </div>
+                {isDirectReject && <span className="text-sm font-bold">✓</span>}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsDirectReject(false)}
+                className={`py-2 px-3 text-xs rounded-lg font-medium border text-left transition flex items-center justify-between ${
+                  !isDirectReject
+                    ? "bg-brand-600 text-white border-brand-600 shadow-xs"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700 hover:border-brand-500"
+                }`}
+              >
+                <div>
+                  <div className="font-bold">📋 Reject Biasa</div>
+                  <div className="text-[10px] opacity-80 mt-0.5">Penolakan standar (regular approval rejection)</div>
+                </div>
+                {!isDirectReject && <span className="text-sm font-bold">✓</span>}
+              </button>
             </div>
           </div>
 

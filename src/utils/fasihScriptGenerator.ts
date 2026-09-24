@@ -10,7 +10,8 @@ export function generateBulkRejectScript(
   supabaseUrl: string,
   supabaseAnonKey: string,
   delayMin: number = 2500,
-  delayMax: number = 4500
+  delayMax: number = 4500,
+  isDirect: boolean = true
 ): string {
   const itemsJson = JSON.stringify(
     items.map((it) => ({
@@ -115,7 +116,8 @@ export function generateBulkRejectScript(
     const payload = {
       assignmentId: assignmentId,
       statusApproval: "false",
-      comment: JSON.stringify({ dataKey: "", notes: [] })
+      comment: JSON.stringify({ dataKey: "", notes: [] }),
+      direct: ${isDirect ? "true" : "false"}
     };
 
     const headers = {
