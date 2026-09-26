@@ -107,15 +107,16 @@ BEGIN
         ORDER BY desa ASC
     ) sub(d);
 
-    -- List SLS unik (terfilter sesuai desa/kecamatan jika ada)
+    -- List SLS unik (terfilter sesuai desa/kecamatan jika ada, diurutkan berdasarkan idsls/idsubsls)
     SELECT json_agg(s) INTO sls_list
     FROM (
-        SELECT DISTINCT sls 
+        SELECT sls 
         FROM public.fasih_reject_items 
         WHERE sls IS NOT NULL AND sls != ''
           AND (target_kecamatan IS NULL OR target_kecamatan = 'all' OR kecamatan = target_kecamatan)
           AND (target_desa IS NULL OR target_desa = 'all' OR desa = target_desa)
-        ORDER BY sls ASC
+        GROUP BY sls
+        ORDER BY MIN(COALESCE(idsls, '')) ASC, sls ASC
     ) sub(s);
 
     RETURN json_build_object(

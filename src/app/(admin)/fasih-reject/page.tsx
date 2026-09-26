@@ -78,7 +78,7 @@ export default function FasihRejectPage() {
       while (hasMore && from < 15000) {
         let q = supabase
           .from("fasih_reject_items")
-          .select("kecamatan, desa, sls")
+          .select("kecamatan, desa, sls, idsls")
           .range(from, from + BATCH - 1);
 
         if (kecamatanFilter !== "all") {
@@ -100,7 +100,17 @@ export default function FasihRejectPage() {
 
       const kecs = Array.from(new Set(allRows.map((d) => d.kecamatan).filter(Boolean))).sort() as string[];
       const desas = Array.from(new Set(allRows.map((d) => d.desa).filter(Boolean))).sort() as string[];
-      const slses = Array.from(new Set(allRows.map((d) => d.sls).filter(Boolean))).sort() as string[];
+      
+      // Ambil SLS unik dan urutkan berdasarkan idsls / idsubsls, tetapi tetap simpan nama SLS
+      const slsMap = new Map<string, string>(); // slsName -> idsls
+      allRows.forEach((d) => {
+        if (d.sls && !slsMap.has(d.sls)) {
+          slsMap.set(d.sls, d.idsls || "");
+        }
+      });
+      const slses = Array.from(slsMap.entries())
+        .sort((a, b) => (a[1] || "").localeCompare(b[1] || ""))
+        .map(([slsName]) => slsName);
 
       if (kecs.length > 0) setDistinctKecamatan(kecs);
       setDistinctDesa(desas);
