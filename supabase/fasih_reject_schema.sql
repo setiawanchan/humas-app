@@ -107,7 +107,7 @@ BEGIN
         ORDER BY desa ASC
     ) sub(d);
 
-    -- List SLS unik (terfilter sesuai desa/kecamatan jika ada, diurutkan berdasarkan idsls/idsubsls)
+    -- List SLS unik (terfilter sesuai desa/kecamatan jika ada, diurutkan berdasarkan idsls)
     SELECT json_agg(s) INTO sls_list
     FROM (
         SELECT sls 
@@ -116,7 +116,7 @@ BEGIN
           AND (target_kecamatan IS NULL OR target_kecamatan = 'all' OR kecamatan = target_kecamatan)
           AND (target_desa IS NULL OR target_desa = 'all' OR desa = target_desa)
         GROUP BY sls
-        ORDER BY MIN(COALESCE(idsls, '')) ASC, sls ASC
+        ORDER BY NULLIF(MIN(COALESCE(idsls, '')), '') ASC NULLS LAST, sls ASC
     ) sub(s);
 
     RETURN json_build_object(

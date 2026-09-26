@@ -55,7 +55,7 @@ export default function FasihRejectPage() {
   // Fetch filter options (Kecamatan, Desa, SLS) secara dinamis & lengkap tanpa batas 1.000
   const fetchFilterOptions = useCallback(async () => {
     try {
-      // Prioritas 1: Panggil RPC function jika sudah dibuat di Supabase
+      // 1. Ambil data Kecamatan dan Desa via RPC jika tersedia untuk efisiensi
       const { data: rpcData, error: rpcError } = await supabase.rpc("get_fasih_filter_options", {
         target_kecamatan: kecamatanFilter === "all" ? null : kecamatanFilter,
         target_desa: desaFilter === "all" ? null : desaFilter,
@@ -64,12 +64,9 @@ export default function FasihRejectPage() {
       if (!rpcError && rpcData) {
         if (rpcData.kecamatan) setDistinctKecamatan(rpcData.kecamatan);
         if (rpcData.desa) setDistinctDesa(rpcData.desa);
-        if (rpcData.sls) setDistinctSls(rpcData.sls);
-        return;
       }
 
-      // Fallback (jika user belum sempat menjalankan script SQL RPC):
-      // Ambil data dalam batch pagination range hingga seluruh nama desa/SLS terkumpul
+      // 2. Query data fasih_reject_items untuk mendapatkan SLS dan IDSLS yang akurat dan berurut
       const allRows: any[] = [];
       const BATCH = 1000;
       let from = 0;
@@ -100,20 +97,38 @@ export default function FasihRejectPage() {
 
       const kecs = Array.from(new Set(allRows.map((d) => d.kecamatan).filter(Boolean))).sort() as string[];
       const desas = Array.from(new Set(allRows.map((d) => d.desa).filter(Boolean))).sort() as string[];
-      
-      // Ambil SLS unik dan urutkan berdasarkan idsls / idsubsls, tetapi tetap simpan nama SLS
-      const slsMap = new Map<string, string>(); // slsName -> idsls
+
+      // Ambil SLS unik dan urutkan berdasarkan idsls
+      // Simpan pasangan { sls, minIdsls }
+      const slsIdMap = new Map<string, string>();
       allRows.forEach((d) => {
-        if (d.sls && !slsMap.has(d.sls)) {
-          slsMap.set(d.sls, d.idsls || "");
+        const slsName = (d.sls || "").trim();
+        const idSlsVal = (d.idsls || "").trim();
+        if (slsName) {
+          if (!slsIdMap.has(slsName)) {
+            slsIdMap.set(slsName, idSlsVal);
+          } else if (idSlsVal && (!slsIdMap.get(slsName) || idSlsVal < slsIdMap.get(slsName)!)) {
+            slsIdMap.set(slsName, idSlsVal);
+          }
         }
       });
-      const slses = Array.from(slsMap.entries())
-        .sort((a, b) => (a[1] || "").localeCompare(b[1] || ""))
+
+      const slses = Array.from(slsIdMap.entries())
+        .sort((a, b) => {
+          const idA = a[1];
+          const idB = b[1];
+          // Jika keduanya punya IDSLS, urutkan numerik/string comparison
+          if (idA && idB) {
+            return idA.localeCompare(idB, undefined, { numeric: true });
+          }
+          if (idA) return -1;
+          if (idB) return 1;
+          return a[0].localeCompare(b[0], undefined, { numeric: true });
+        })
         .map(([slsName]) => slsName);
 
-      if (kecs.length > 0) setDistinctKecamatan(kecs);
-      setDistinctDesa(desas);
+      if (kecs.length > 0 && (!rpcData || !rpcData.kecamatan)) setDistinctKecamatan(kecs);
+      if (desas.length > 0 && (!rpcData || !rpcData.desa)) setDistinctDesa(desas);
       setDistinctSls(slses);
     } catch (err) {
       console.warn("Gagal mengambil options filter", err);
