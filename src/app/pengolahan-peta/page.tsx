@@ -63,6 +63,16 @@ export default function PengolahanPetaPage() {
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState("");
 
+  // Modal State Update Massal per Desa
+  const [isBulkDesaModalOpen, setIsBulkDesaModalOpen] = useState(false);
+  const [bulkKec, setBulkKec] = useState<string>("");
+  const [bulkDesa, setBulkDesa] = useState<string>("");
+  const [bulkStatusScan, setBulkStatusScan] = useState<"keep" | "-" | "Sudah" | "Belum">("keep");
+  const [bulkStatusOlah, setBulkStatusOlah] = useState<"keep" | "-" | "Sudah" | "Belum">("keep");
+  const [bulkTglOlah, setBulkTglOlah] = useState<string>("");
+  const [bulkCatatan, setBulkCatatan] = useState<string>("");
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
+
   // Ambil daftar petugas (khusus role eksternal atau semua user)
   const listPetugas = useMemo(() => {
     return users.filter((u) => u.role === "eksternal" || u.is_active);
@@ -156,6 +166,19 @@ export default function PengolahanPetaPage() {
       .map(([kode, nama]) => ({ kode, nama }))
       .sort((a, b) => a.kode.localeCompare(b.kode));
   }, [dokseList, selectedKec]);
+
+  // List Desa untuk modal Bulk Desa
+  const listDesaForBulk = useMemo(() => {
+    let filtered = dokseList;
+    if (bulkKec) {
+      filtered = filtered.filter((d) => d.kode_kec === bulkKec);
+    }
+    const map = new Map<string, string>();
+    filtered.forEach((d) => map.set(d.kode_desa, d.nama_desa));
+    return Array.from(map.entries())
+      .map(([kode, nama]) => ({ kode, nama }))
+      .sort((a, b) => a.kode.localeCompare(b.kode));
+  }, [dokseList, bulkKec]);
 
   // Filter Data berdasarkan User & Parameter Filter
   const filteredData = useMemo(() => {
@@ -580,6 +603,154 @@ export default function PengolahanPetaPage() {
     alert(`Berhasil mengalokasikan ${countSuccess} peta ke petugas.`);
   };
 
+  // Handler Buka Modal Bulk Desa (Default mengambil nilai filter jika ada)
+  const handleOpenBulkDesaModal = () => {
+    const defaultKec = selectedKec !== "all" ? selectedKec : listKecamatan[0]?.kode || "";
+    setBulkKec(defaultKec);
+
+    let defaultDesa = "";
+    if (selectedDesa !== "all") {
+      defaultDesa = selectedDesa;
+    } else {
+      const firstDesa = dokseList.find((d) => d.kode_kec === defaultKec)?.kode_desa || "";
+      defaultDesa = firstDesa;
+    }
+    setBulkDesa(defaultDesa);
+    setBulkStatusScan("keep");
+    setBulkStatusOlah("keep");
+    setBulkTglOlah("");
+    setBulkCatatan("");
+    setIsBulkDesaModalOpen(true);
+  };
+
+  // Kalkulasi item yang terdampak oleh Bulk Desa
+  const bulkPreviewStats = useMemo(() => {
+    if (!bulkKec || !bulkDesa) {
+      return { totalInDesa: 0, eligibleCount: 0, skippedCount: 0, eligibleItems: [] };
+    }
+
+    const inDesa = mergedDataList.filter(
+      (item) => item.kode_kec === bulkKec && item.kode_desa === bulkDesa
+    );
+
+    const eligibleItems = inDesa.filter((item) => {
+      // 1. Cek hak akses
+      if (!isAdmin) {
+        if (!currentUser) return false;
+        const isMine =
+          item.petugas_id === currentUser.id ||
+          item.nama_petugas?.toLowerCase() === currentUser.nama.toLowerCase();
+        if (!isMine) return false;
+      }
+      // 2. Wajib dokumen fisik lengkap
+      return item.isFisikLengkap;
+    });
+
+    const skippedCount = inDesa.length - eligibleItems.length;
+
+    return {
+      totalInDesa: inDesa.length,
+      eligibleCount: eligibleItems.length,
+      skippedCount,
+      eligibleItems,
+    };
+  }, [bulkKec, bulkDesa, mergedDataList, isAdmin, currentUser]);
+
+  // Handler Submit Update Massal per Desa
+  const handleSaveBulkDesa = async () => {
+    if (!bulkKec || !bulkDesa) {
+      alert("Harap pilih Kecamatan dan Desa terlebih dahulu.");
+      return;
+    }
+
+    if (bulkStatusScan === "keep" && bulkStatusOlah === "keep" && !bulkCatatan.trim()) {
+      alert("Harap pilih perubahan Status Scan, Status Olah, atau isi Catatan yang ingin diterapkan.");
+      return;
+    }
+
+    const { eligibleItems } = bulkPreviewStats;
+    if (eligibleItems.length === 0) {
+      alert("Tidak ada peta di desa ini yang memenuhi syarat untuk diupdate (pastikan dokumen fisik sudah lengkap dan peta dialokasikan ke Anda).");
+      return;
+    }
+
+    const confirmMsg = `Anda akan mengupdate ${eligibleItems.length} peta di desa terpilih.\n` +
+      `- Status Scan: ${bulkStatusScan === "keep" ? "Tidak diubah" : bulkStatusScan}\n` +
+      `- Status Olah: ${bulkStatusOlah === "keep" ? "Tidak diubah" : bulkStatusOlah}\n` +
+      (bulkStatusOlah === "Sudah" && bulkTglOlah ? `- Tanggal Selesai: ${bulkTglOlah}\n` : "") +
+      (bulkCatatan.trim() ? `- Catatan: ${bulkCatatan.trim()}\n` : "") +
+      `Lanjutkan?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsBulkSaving(true);
+    const updates: Array<Partial<PengolahanRecord> & { idsubsls: string }> = [];
+
+    const defaultDate = new Date().toISOString().split("T")[0];
+
+    eligibleItems.forEach((item) => {
+      const currentRec = pengolahanMap.get(item.idsubsls);
+
+      const newScan =
+        bulkStatusScan === "keep"
+          ? (item.status_scan as "-" | "Sudah" | "Belum")
+          : bulkStatusScan;
+
+      const newOlah =
+        bulkStatusOlah === "keep"
+          ? (item.status_olah as "-" | "Sudah" | "Belum")
+          : bulkStatusOlah;
+
+      let newTgl = currentRec?.tgl_selesai_olah || null;
+      if (bulkStatusOlah === "Sudah") {
+        newTgl = bulkTglOlah.trim() || currentRec?.tgl_selesai_olah || defaultDate;
+      } else if (bulkStatusOlah === "Belum" || bulkStatusOlah === "-") {
+        newTgl = null;
+      }
+
+      const newCatatan = bulkCatatan.trim() ? bulkCatatan.trim() : (currentRec?.catatan || null);
+
+      updates.push({
+        idsubsls: item.idsubsls,
+        petugas_id: item.petugas_id,
+        nama_petugas: item.nama_petugas,
+        status_scan: newScan,
+        status_olah: newOlah,
+        tgl_selesai_olah: newTgl,
+        catatan: newCatatan,
+      });
+    });
+
+    try {
+      await bulkUpsertPengolahanRecordsInSupabase(updates);
+
+      // Optimistic update local map
+      setPengolahanMap((prev) => {
+        const next = new Map(prev);
+        updates.forEach((u) => {
+          next.set(u.idsubsls, {
+            idsubsls: u.idsubsls,
+            petugas_id: u.petugas_id || null,
+            nama_petugas: u.nama_petugas || null,
+            status_scan: u.status_scan || "-",
+            status_olah: u.status_olah || "-",
+            tgl_selesai_olah: u.tgl_selesai_olah || null,
+            catatan: u.catatan || null,
+          });
+        });
+        return next;
+      });
+
+      setIsBulkDesaModalOpen(false);
+      alert(`Berhasil memperbarui ${updates.length} peta di desa ini!`);
+    } catch (err: any) {
+      console.error("Gagal update massal per desa:", err);
+      alert("Terjadi kesalahan saat menyimpan data: " + (err.message || err));
+    } finally {
+      setIsBulkSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
       {/* Standalone Header Bar Tanpa Sidebar */}
@@ -631,6 +802,18 @@ export default function PengolahanPetaPage() {
                 Import Alokasi
               </button>
             )}
+
+            {/* Tombol Update Massal per Desa (Admin & Petugas) */}
+            <button
+              onClick={handleOpenBulkDesaModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow-xs cursor-pointer"
+              title="Update status scan & selesai olah sekaligus untuk seluruh SLS di suatu desa"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Update Massal Desa
+            </button>
 
             <button
               onClick={handleExportCSV}
@@ -1350,6 +1533,214 @@ export default function PengolahanPetaPage() {
               className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition"
             >
               Tutup
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Update Massal per Desa */}
+      <Modal
+        isOpen={isBulkDesaModalOpen}
+        onClose={() => {
+          if (!isBulkSaving) setIsBulkDesaModalOpen(false);
+        }}
+        className="max-w-lg p-6"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div className="w-10 h-10 rounded-xl bg-brand-500/10 dark:bg-brand-400/20 text-brand-600 dark:text-brand-400 flex items-center justify-center font-bold text-lg">
+              ⚡
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                Update Status Massal per Desa
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Terapkan status scan, selesai olah, atau catatan sekaligus untuk semua SLS di satu desa.
+              </p>
+            </div>
+          </div>
+
+          {/* Pemilihan Wilayah Desa */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                Kecamatan
+              </label>
+              <select
+                value={bulkKec}
+                onChange={(e) => {
+                  const newKec = e.target.value;
+                  setBulkKec(newKec);
+                  const firstDesa = dokseList.find((d) => d.kode_kec === newKec)?.kode_desa || "";
+                  setBulkDesa(firstDesa);
+                }}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+              >
+                {listKecamatan.map((k) => (
+                  <option key={k.kode} value={k.kode}>
+                    [{k.kode}] {k.nama}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                Desa / Kelurahan
+              </label>
+              <select
+                value={bulkDesa}
+                onChange={(e) => setBulkDesa(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+              >
+                {listDesaForBulk.map((d) => (
+                  <option key={d.kode} value={d.kode}>
+                    [{d.kode}] {d.nama}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Info Banner Kalkulasi Eligible vs Skipped */}
+          <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/30 text-xs text-blue-900 dark:text-blue-200 space-y-1">
+            <div className="flex items-center justify-between font-semibold">
+              <span>📊 Ringkasan Target Peta:</span>
+              <span className="text-[11px] font-mono">
+                Total di Desa: {bulkPreviewStats.totalInDesa} SLS
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+              <div className="bg-white/80 dark:bg-gray-900/60 p-2 rounded-lg border border-emerald-300 dark:border-emerald-800">
+                <span className="text-emerald-700 dark:text-emerald-300 font-bold block">
+                  ✓ {bulkPreviewStats.eligibleCount} Peta Siap Diupdate
+                </span>
+                <span className="text-gray-500 text-[10px]">
+                  {isAdmin ? "Dokumen fisik lengkap" : "Tugas Anda & fisik lengkap"}
+                </span>
+              </div>
+              <div className="bg-white/80 dark:bg-gray-900/60 p-2 rounded-lg border border-rose-300 dark:border-rose-800">
+                <span className="text-rose-700 dark:text-rose-300 font-bold block">
+                  ✕ {bulkPreviewStats.skippedCount} Peta Dilewati
+                </span>
+                <span className="text-gray-500 text-[10px]">
+                  Fisik belum lengkap / bukan tugas Anda
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Pilihan Perubahan Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                Status Scan Peta
+              </label>
+              <select
+                value={bulkStatusScan}
+                onChange={(e) =>
+                  setBulkStatusScan(e.target.value as "keep" | "-" | "Sudah" | "Belum")
+                }
+                className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+              >
+                <option value="keep">-- Jangan Ubah Status Scan --</option>
+                <option value="Sudah">Sudah</option>
+                <option value="Belum">Belum</option>
+                <option value="-">-</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                Status Pengolahan
+              </label>
+              <select
+                value={bulkStatusOlah}
+                onChange={(e) => {
+                  const val = e.target.value as "keep" | "-" | "Sudah" | "Belum";
+                  setBulkStatusOlah(val);
+                  if (val === "Sudah" && !bulkTglOlah) {
+                    setBulkTglOlah(new Date().toISOString().split("T")[0]);
+                  }
+                }}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+              >
+                <option value="keep">-- Jangan Ubah Status Olah --</option>
+                <option value="Sudah">Sudah</option>
+                <option value="Belum">Belum</option>
+                <option value="-">-</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Tanggal Selesai Olah (Muncul jika status olah diubah ke 'Sudah') */}
+          {bulkStatusOlah === "Sudah" && (
+            <div className="bg-brand-50/50 dark:bg-brand-950/30 p-3 rounded-xl border border-brand-200 dark:border-brand-800/60">
+              <label className="block text-xs font-semibold text-brand-900 dark:text-brand-300 mb-1">
+                Tanggal Selesai Pengolahan
+              </label>
+              <input
+                type="date"
+                value={bulkTglOlah}
+                onChange={(e) => setBulkTglOlah(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <span className="text-[10px] text-gray-500 mt-0.5 block">
+                Default: tanggal hari ini. Akan disimpan ke semua SLS yang berstatus &apos;Sudah&apos;.
+              </span>
+            </div>
+          )}
+
+          {/* Catatan Massal (Opsional) */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              Catatan Pengolahan (Opsional)
+            </label>
+            <input
+              type="text"
+              placeholder="Contoh: Selesai digitasi & validasi batas desa..."
+              value={bulkCatatan}
+              onChange={(e) => setBulkCatatan(e.target.value)}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <span className="text-[10px] text-gray-400 mt-0.5 block">
+              Biarkan kosong jika tidak ingin menimpa catatan SLS yang sudah ada.
+            </span>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-gray-800">
+            <button
+              type="button"
+              disabled={isBulkSaving}
+              onClick={() => setIsBulkDesaModalOpen(false)}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              disabled={
+                isBulkSaving ||
+                bulkPreviewStats.eligibleCount === 0 ||
+                (bulkStatusScan === "keep" &&
+                  bulkStatusOlah === "keep" &&
+                  !bulkCatatan.trim())
+              }
+              onClick={handleSaveBulkDesa}
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-brand-500 hover:bg-brand-600 text-white transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isBulkSaving ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : (
+                <>
+                  <span>⚡ Terapkan ke {bulkPreviewStats.eligibleCount} SLS</span>
+                </>
+              )}
             </button>
           </div>
         </div>
