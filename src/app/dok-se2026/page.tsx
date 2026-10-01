@@ -550,16 +550,20 @@ export default function Dokse2026Page() {
     setIsBulkDesaModalOpen(true);
   };
 
-  // Kalkulasi target SLS yang terdampak di Desa terpilih
-  const bulkDesaTargetItems = useMemo(() => {
-    if (!bulkKec || !bulkDesa) return [];
+  // Kalkulasi target SLS yang terdampak di Wilayah terpilih (per Desa atau seluruh Kecamatan)
+  const isAllDesaInKec = bulkDesa === "all";
+  const bulkTargetItems = useMemo(() => {
+    if (!bulkKec) return [];
+    if (isAllDesaInKec) {
+      return dataList.filter((d) => d.kode_kec === bulkKec);
+    }
     return dataList.filter((d) => d.kode_kec === bulkKec && d.kode_desa === bulkDesa);
-  }, [dataList, bulkKec, bulkDesa]);
+  }, [dataList, bulkKec, bulkDesa, isAllDesaInKec]);
 
-  // Handler Simpan Update Massal per Desa
+  // Handler Simpan Update Massal Wilayah (Desa / Kecamatan)
   const handleSaveBulkDesa = async () => {
     if (!bulkKec || !bulkDesa) {
-      alert("Harap pilih Kecamatan dan Desa terlebih dahulu.");
+      alert("Harap pilih Kecamatan dan target Desa terlebih dahulu.");
       return;
     }
 
@@ -574,13 +578,18 @@ export default function Dokse2026Page() {
       return;
     }
 
-    if (bulkDesaTargetItems.length === 0) {
-      alert("Tidak ada SLS yang ditemukan pada desa terpilih.");
+    if (bulkTargetItems.length === 0) {
+      alert("Tidak ada SLS yang ditemukan pada wilayah terpilih.");
       return;
     }
 
+    const kecName = listKecamatan.find((k) => k.kode === bulkKec)?.nama || bulkKec;
+    const desaName = isAllDesaInKec
+      ? `Seluruh Desa di Kec. ${kecName}`
+      : listDesaForBulk.find((d) => d.kode === bulkDesa)?.nama || bulkDesa;
+
     const confirmMsg =
-      `Anda akan memperbarui ${bulkDesaTargetItems.length} SLS di desa terpilih.\n` +
+      `Anda akan memperbarui ${bulkTargetItems.length} SLS pada ${desaName}.\n` +
       `- Peta Desa: ${bulkPetaDesa === "keep" ? "Tidak diubah" : bulkPetaDesa}\n` +
       `- Peta Sub-RT: ${bulkPetaSubrt === "keep" ? "Tidak diubah" : bulkPetaSubrt}\n` +
       `- Dokumen PSLS: ${bulkDokumenPsls === "keep" ? "Tidak diubah" : bulkDokumenPsls}\n` +
@@ -594,7 +603,11 @@ export default function Dokse2026Page() {
 
     try {
       const updatedList = dataList.map((item) => {
-        if (item.kode_kec === bulkKec && item.kode_desa === bulkDesa) {
+        const isMatched = isAllDesaInKec
+          ? item.kode_kec === bulkKec
+          : item.kode_kec === bulkKec && item.kode_desa === bulkDesa;
+
+        if (isMatched) {
           return {
             ...item,
             peta_desa: bulkPetaDesa === "keep" ? item.peta_desa : bulkPetaDesa,
@@ -611,15 +624,17 @@ export default function Dokse2026Page() {
       setDataList(updatedList);
 
       // Sinkronisasi ke Supabase
-      const affectedItems = updatedList.filter(
-        (item) => item.kode_kec === bulkKec && item.kode_desa === bulkDesa
+      const affectedItems = updatedList.filter((item) =>
+        isAllDesaInKec
+          ? item.kode_kec === bulkKec
+          : item.kode_kec === bulkKec && item.kode_desa === bulkDesa
       );
       await bulkInsertDokseDataToSupabase(affectedItems);
 
       setIsBulkDesaModalOpen(false);
-      alert(`Berhasil memperbarui ${affectedItems.length} SLS di desa terpilih!`);
+      alert(`Berhasil memperbarui ${affectedItems.length} SLS pada ${desaName}!`);
     } catch (err: any) {
-      console.error("Gagal simpan massal per desa:", err);
+      console.error("Gagal simpan massal wilayah:", err);
       alert("Terjadi kesalahan saat menyimpan data: " + (err.message || err));
     } finally {
       setIsBulkSaving(false);
@@ -897,17 +912,17 @@ export default function Dokse2026Page() {
               Unduh Excel (CSV)
             </button>
 
-            {/* Tombol Update Massal per Desa (Khusus Mode Admin) */}
+            {/* Tombol Update Massal Wilayah (Desa/Kecamatan) (Khusus Mode Admin) */}
             {isAdminLoggedIn && (
               <button
                 onClick={handleOpenBulkDesaModal}
                 className="px-3.5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow transition cursor-pointer flex items-center gap-1.5"
-                title="Update status peta sub-rt, dokumen psls, peta terisi sekaligus per desa"
+                title="Update status peta sub-rt, dokumen psls, peta terisi sekaligus per desa atau seluruh kecamatan"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                Update Massal Desa
+                Update Massal Wilayah
               </button>
             )}
 
@@ -1523,7 +1538,7 @@ export default function Dokse2026Page() {
         </Modal>
       )}
 
-      {/* ===================== MODAL UPDATE MASSAL PER DESA ===================== */}
+      {/* ===================== MODAL UPDATE MASSAL WILAYAH (DESA / KECAMATAN) ===================== */}
       {isBulkDesaModalOpen && (
         <Modal
           isOpen={isBulkDesaModalOpen}
@@ -1540,10 +1555,10 @@ export default function Dokse2026Page() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                  Update Status Dokumen Massal per Desa
+                  Update Status Dokumen Massal Wilayah
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Perbarui status dokumen sekaligus untuk seluruh SLS di satu desa yang dipilih.
+                  Perbarui status dokumen sekaligus untuk seluruh SLS di satu desa atau langsung 1 kecamatan penuh.
                 </p>
               </div>
             </div>
@@ -1559,8 +1574,7 @@ export default function Dokse2026Page() {
                   onChange={(e) => {
                     const newKec = e.target.value;
                     setBulkKec(newKec);
-                    const firstDesa = dataList.find((d) => d.kode_kec === newKec)?.kode_desa || "";
-                    setBulkDesa(firstDesa);
+                    setBulkDesa("all");
                   }}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
                 >
@@ -1574,13 +1588,16 @@ export default function Dokse2026Page() {
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  Desa / Kelurahan
+                  Cakupan Desa / Kelurahan
                 </label>
                 <select
                   value={bulkDesa}
                   onChange={(e) => setBulkDesa(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer font-medium"
                 >
+                  <option value="all" className="font-bold text-brand-600 dark:text-brand-400">
+                    🌟 [Semua Desa dalam Kecamatan]
+                  </option>
                   {listDesaForBulk.map((d) => (
                     <option key={d.kode} value={d.kode}>
                       [{d.kode}] {d.nama}
@@ -1591,10 +1608,19 @@ export default function Dokse2026Page() {
             </div>
 
             {/* Info Preview Target SLS */}
-            <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/30 text-xs text-blue-900 dark:text-blue-200 flex items-center justify-between">
-              <span className="font-semibold">🎯 Target SLS yang akan diperbarui:</span>
-              <span className="font-bold text-xs bg-white dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 font-mono">
-                {bulkDesaTargetItems.length} SLS
+            <div className={`p-3 rounded-xl border text-xs flex items-center justify-between transition-colors ${
+              isAllDesaInKec
+                ? "border-purple-200 dark:border-purple-900/60 bg-purple-50/70 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200"
+                : "border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200"
+            }`}>
+              <span className="font-semibold flex items-center gap-1.5">
+                <span>🎯</span>
+                <span>
+                  Target {isAllDesaInKec ? "1 Kecamatan Penuh" : "Desa Terpilih"}:
+                </span>
+              </span>
+              <span className="font-bold text-xs bg-white dark:bg-gray-800 px-2.5 py-1 rounded-lg border border-current font-mono shadow-xs">
+                {bulkTargetItems.length} SLS
               </span>
             </div>
 
@@ -1700,7 +1726,7 @@ export default function Dokse2026Page() {
                 type="button"
                 disabled={
                   isBulkSaving ||
-                  bulkDesaTargetItems.length === 0 ||
+                  bulkTargetItems.length === 0 ||
                   (bulkPetaDesa === "keep" &&
                     bulkPetaSubrt === "keep" &&
                     bulkDokumenPsls === "keep" &&
@@ -1717,7 +1743,7 @@ export default function Dokse2026Page() {
                   </>
                 ) : (
                   <>
-                    <span>⚡ Terapkan ke {bulkDesaTargetItems.length} SLS</span>
+                    <span>⚡ Terapkan ke {bulkTargetItems.length} SLS</span>
                   </>
                 )}
               </button>
