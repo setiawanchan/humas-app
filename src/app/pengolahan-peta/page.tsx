@@ -17,6 +17,12 @@ import {
 } from "@/lib/supabase/pengolahan-service";
 import { Modal } from "@/components/ui/modal";
 import * as XLSX from "xlsx";
+import dynamic from "next/dynamic";
+import { ApexOptions } from "apexcharts";
+
+const ReactApexChart = dynamic(() => import("react-apexcharts"), {
+  ssr: false,
+});
 
 export default function PengolahanPetaPage() {
   const { currentUser, users, loginWithCredentials, logout } = useAuth();
@@ -62,6 +68,15 @@ export default function PengolahanPetaPage() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState("");
+
+  // State Modal Dashboard Stats Pengolahan Peta
+  const [isDashboardModalOpen, setIsDashboardModalOpen] = useState(false);
+  const [activeDashboardTab, setActiveDashboardTab] = useState<"overview" | "progres_wilayah" | "progres_petugas">("overview");
+
+  // State Drilldown Progres Wilayah di Dashboard
+  const [dashSelectedKec, setDashSelectedKec] = useState<string>("all");
+  const [dashSelectedDesa, setDashSelectedDesa] = useState<string>("all");
+  const [dashPetugasSearchQuery, setDashPetugasSearchQuery] = useState("");
 
   // Modal State Update Massal per Desa
   const [isBulkDesaModalOpen, setIsBulkDesaModalOpen] = useState(false);
@@ -272,6 +287,331 @@ export default function PengolahanPetaPage() {
       persentaseOlah,
     };
   }, [mergedDataList, isAdmin, currentUser]);
+
+  // ===================== KALKULASI DASHBOARD STATISTIK LENGKAP =====================
+  const dashboardStats = useMemo(() => {
+    const totalPeta = mergedDataList.length;
+    let fisikLengkapCount = 0;
+    let scanSudah = 0;
+    let scanBelum = 0;
+    let olahSudah = 0;
+    let olahBelum = 0;
+    let assignedCount = 0;
+    let unassignedCount = 0;
+
+    mergedDataList.forEach((item) => {
+      if (item.isFisikLengkap) fisikLengkapCount++;
+      if (item.status_scan === "Sudah") scanSudah++;
+      else scanBelum++;
+
+      if (item.status_olah === "Sudah") olahSudah++;
+      else olahBelum++;
+
+      if (item.petugas_id) assignedCount++;
+      else unassignedCount++;
+    });
+
+    const fisikBelumCount = totalPeta - fisikLengkapCount;
+    const olahPct = totalPeta > 0 ? Math.round((olahSudah / totalPeta) * 100) : 0;
+    const scanPct = totalPeta > 0 ? Math.round((scanSudah / totalPeta) * 100) : 0;
+
+    return {
+      totalPeta,
+      fisikLengkapCount,
+      fisikBelumCount,
+      scanSudah,
+      scanBelum,
+      olahSudah,
+      olahBelum,
+      assignedCount,
+      unassignedCount,
+      olahPct,
+      scanPct,
+    };
+  }, [mergedDataList]);
+
+  // ApexCharts Configs untuk Dashboard Pengolahan Peta
+  const olahDonutSeries = useMemo(() => [
+    dashboardStats.olahSudah,
+    dashboardStats.olahBelum
+  ], [dashboardStats]);
+
+  const olahDonutOptions: ApexOptions = useMemo(() => ({
+    chart: {
+      type: "donut",
+      fontFamily: "Outfit, sans-serif",
+    },
+    labels: ["Sudah Diolah", "Belum Diolah"],
+    colors: ["#10B981", "#EF4444"],
+    legend: {
+      position: "bottom",
+      fontSize: "12px",
+      fontWeight: 600,
+    },
+    dataLabels: {
+      enabled: true,
+      formatter: function (val: number) {
+        return val.toFixed(1) + "%";
+      },
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: "65%",
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Total SLS Peta",
+              formatter: () => `${dashboardStats.totalPeta}`,
+            },
+          },
+        },
+      },
+    },
+  }), [dashboardStats]);
+
+  const scanDonutSeries = useMemo(() => [
+    dashboardStats.scanSudah,
+    dashboardStats.scanBelum
+  ], [dashboardStats]);
+
+  const scanDonutOptions: ApexOptions = useMemo(() => ({
+    chart: {
+      type: "donut",
+      fontFamily: "Outfit, sans-serif",
+    },
+    labels: ["Sudah Scan", "Belum Scan"],
+    colors: ["#3B82F6", "#F59E0B"],
+    legend: {
+      position: "bottom",
+      fontSize: "12px",
+      fontWeight: 600,
+    },
+    dataLabels: {
+      enabled: true,
+      formatter: function (val: number) {
+        return val.toFixed(1) + "%";
+      },
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: "65%",
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Total SLS Peta",
+              formatter: () => `${dashboardStats.totalPeta}`,
+            },
+          },
+        },
+      },
+    },
+  }), [dashboardStats]);
+
+  const overviewBarSeries = useMemo(() => [
+    {
+      name: "Selesai / Lengkap",
+      data: [
+        dashboardStats.fisikLengkapCount,
+        dashboardStats.scanSudah,
+        dashboardStats.olahSudah,
+        dashboardStats.assignedCount,
+      ],
+    },
+    {
+      name: "Belum Selesai / Belum Lengkap",
+      data: [
+        dashboardStats.fisikBelumCount,
+        dashboardStats.scanBelum,
+        dashboardStats.olahBelum,
+        dashboardStats.unassignedCount,
+      ],
+    },
+  ], [dashboardStats]);
+
+  const overviewBarOptions: ApexOptions = useMemo(() => ({
+    chart: {
+      type: "bar",
+      stacked: false,
+      fontFamily: "Outfit, sans-serif",
+      toolbar: { show: false },
+    },
+    colors: ["#10B981", "#EF4444"],
+    plotOptions: {
+      bar: {
+        horizontal: false,
+        columnWidth: "45%",
+        borderRadius: 4,
+      },
+    },
+    dataLabels: {
+      enabled: true,
+    },
+    xaxis: {
+      categories: ["Dokumen Fisik", "Scanning Peta", "Pengolahan Peta", "Alokasi Petugas"],
+      labels: {
+        style: {
+          fontSize: "11px",
+          fontWeight: 600,
+        },
+      },
+    },
+    legend: {
+      position: "top",
+      fontSize: "12px",
+      fontWeight: 600,
+    },
+  }), []);
+
+  // Rekapitulasi Progres Capaian Per Kecamatan
+  const kecProgressList = useMemo(() => {
+    const map = new Map<string, {
+      kode: string;
+      nama: string;
+      total: number;
+      fisikLengkap: number;
+      scanSudah: number;
+      olahSudah: number;
+      olahBelum: number;
+    }>();
+
+    mergedDataList.forEach((item) => {
+      const existing = map.get(item.kode_kec) || {
+        kode: item.kode_kec,
+        nama: item.nama_kec,
+        total: 0,
+        fisikLengkap: 0,
+        scanSudah: 0,
+        olahSudah: 0,
+        olahBelum: 0,
+      };
+
+      existing.total += 1;
+      if (item.isFisikLengkap) existing.fisikLengkap += 1;
+      if (item.status_scan === "Sudah") existing.scanSudah += 1;
+      if (item.status_olah === "Sudah") existing.olahSudah += 1;
+      else existing.olahBelum += 1;
+
+      map.set(item.kode_kec, existing);
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.kode.localeCompare(b.kode));
+  }, [mergedDataList]);
+
+  // Rekapitulasi Progres Capaian Per Desa (Filtered by dashSelectedKec)
+  const desaProgressList = useMemo(() => {
+    let filtered = mergedDataList;
+    if (dashSelectedKec !== "all") {
+      filtered = filtered.filter((d) => d.kode_kec === dashSelectedKec);
+    }
+
+    const map = new Map<string, {
+      kode: string;
+      nama: string;
+      namaKec: string;
+      total: number;
+      fisikLengkap: number;
+      scanSudah: number;
+      olahSudah: number;
+      olahBelum: number;
+    }>();
+
+    filtered.forEach((item) => {
+      const existing = map.get(item.kode_desa) || {
+        kode: item.kode_desa,
+        nama: item.nama_desa,
+        namaKec: item.nama_kec,
+        total: 0,
+        fisikLengkap: 0,
+        scanSudah: 0,
+        olahSudah: 0,
+        olahBelum: 0,
+      };
+
+      existing.total += 1;
+      if (item.isFisikLengkap) existing.fisikLengkap += 1;
+      if (item.status_scan === "Sudah") existing.scanSudah += 1;
+      if (item.status_olah === "Sudah") existing.olahSudah += 1;
+      else existing.olahBelum += 1;
+
+      map.set(item.kode_desa, existing);
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.kode.localeCompare(b.kode));
+  }, [mergedDataList, dashSelectedKec]);
+
+  // Rekapitulasi Detail SLS / SubSLS (Filtered by dashSelectedKec & dashSelectedDesa)
+  const slsProgressList = useMemo(() => {
+    let filtered = mergedDataList;
+    if (dashSelectedKec !== "all") {
+      filtered = filtered.filter((d) => d.kode_kec === dashSelectedKec);
+    }
+    if (dashSelectedDesa !== "all") {
+      filtered = filtered.filter((d) => d.kode_desa === dashSelectedDesa);
+    }
+
+    return filtered.map((item) => {
+      const pendingTasks: string[] = [];
+      if (!item.isFisikLengkap) pendingTasks.push("Fisik Belum Lengkap");
+      if (item.status_scan !== "Sudah") pendingTasks.push("Belum Scan");
+      if (item.status_olah !== "Sudah") pendingTasks.push("Belum Olah");
+      if (!item.petugas_id) pendingTasks.push("Belum Ada Petugas");
+
+      return {
+        ...item,
+        isCompleted: item.status_olah === "Sudah",
+        pendingTasks,
+      };
+    }).sort((a, b) => a.idsubsls.localeCompare(b.idsubsls));
+  }, [mergedDataList, dashSelectedKec, dashSelectedDesa]);
+
+  // Rekapitulasi Progres Capaian Per Petugas
+  const petugasProgressList = useMemo(() => {
+    const map = new Map<string, {
+      petugasId: string;
+      nama: string;
+      total: number;
+      scanSudah: number;
+      olahSudah: number;
+      olahBelum: number;
+    }>();
+
+    mergedDataList.forEach((item) => {
+      const pId = item.petugas_id || "unassigned";
+      const pNama = item.nama_petugas || "Belum Dialokasikan";
+
+      const existing = map.get(pId) || {
+        petugasId: pId,
+        nama: pNama,
+        total: 0,
+        scanSudah: 0,
+        olahSudah: 0,
+        olahBelum: 0,
+      };
+
+      existing.total += 1;
+      if (item.status_scan === "Sudah") existing.scanSudah += 1;
+      if (item.status_olah === "Sudah") existing.olahSudah += 1;
+      else existing.olahBelum += 1;
+
+      map.set(pId, existing);
+    });
+
+    let list = Array.from(map.values());
+    if (dashPetugasSearchQuery.trim()) {
+      const q = dashPetugasSearchQuery.toLowerCase();
+      list = list.filter((p) => p.nama.toLowerCase().includes(q));
+    }
+
+    return list.sort((a, b) => {
+      if (a.petugasId === "unassigned") return 1;
+      if (b.petugasId === "unassigned") return -1;
+      return b.total - a.total;
+    });
+  }, [mergedDataList, dashPetugasSearchQuery]);
 
   // Data Paginasi
   const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
@@ -783,6 +1123,16 @@ export default function PengolahanPetaPage() {
 
           {/* Action Buttons & Status Login */}
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Tombol Dashboard Rekapitulasi (Fullscreen Modal) */}
+            <button
+              onClick={() => setIsDashboardModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow transition cursor-pointer"
+              title="Buka Dashboard Rekapitulasi & Progres Wilayah"
+            >
+              <span className="text-sm">📊</span>
+              <span>Dashboard Rekap</span>
+            </button>
+
             <Link
               href="/dok-se2026"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold transition"
@@ -1826,6 +2176,668 @@ export default function PengolahanPetaPage() {
           </form>
         </div>
       </Modal>
+
+      {/* ===================== MODAL DASHBOARD STATISTIK REKAPITULASI (FULL SCREEN) ===================== */}
+      {isDashboardModalOpen && (
+        <Modal
+          isOpen={isDashboardModalOpen}
+          onClose={() => setIsDashboardModalOpen(false)}
+          showCloseButton={true}
+          isFullscreen={true}
+          className="p-3 sm:p-5 md:p-6 bg-white dark:bg-gray-900 min-h-screen text-gray-900 dark:text-white"
+        >
+          <div className="max-w-[1600px] mx-auto space-y-4 sm:space-y-5 h-full flex flex-col justify-between">
+            {/* Header Dialog Dashboard */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 pr-12 sm:pr-16">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                  🗺️
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    Dashboard Progres Scanning & Pengolahan Peta SE2026
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
+                      Full Screen View
+                    </span>
+                  </h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Sistem Pengawasan Real-time Capaian Scan, Olah, dan Alokasi Beban Petugas BPS Kabupaten Lebak
+                  </p>
+                </div>
+              </div>
+
+              {/* Tab Switcher */}
+              <div className="flex items-center gap-1.5 bg-gray-200 dark:bg-gray-800 p-1.5 rounded-2xl self-start sm:self-auto flex-wrap">
+                <button
+                  onClick={() => setActiveDashboardTab("overview")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    activeDashboardTab === "overview"
+                      ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-xs"
+                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                  }`}
+                >
+                  <span>📈</span> Ringkasan Visual Grafik
+                </button>
+                <button
+                  onClick={() => setActiveDashboardTab("progres_wilayah")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    activeDashboardTab === "progres_wilayah"
+                      ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-xs"
+                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                  }`}
+                >
+                  <span>🏛️</span> Progres Wilayah (Drill-down)
+                </button>
+                <button
+                  onClick={() => setActiveDashboardTab("progres_petugas")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    activeDashboardTab === "progres_petugas"
+                      ? "bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-xs"
+                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                  }`}
+                >
+                  <span>👥</span> Capaian per Petugas
+                </button>
+              </div>
+            </div>
+
+            {/* TAB 1: RINGKASAN VISUAL (CHARTS & CARDS) */}
+            {activeDashboardTab === "overview" && (
+              <div className="space-y-6 overflow-y-auto pr-1">
+                {/* Metric Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xs">
+                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total SLS / Peta</span>
+                    <div className="text-2xl font-extrabold text-gray-900 dark:text-white mt-1">
+                      {dashboardStats.totalPeta} <span className="text-xs font-medium text-gray-500">Peta SLS</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-purple-50/80 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 shadow-xs">
+                    <span className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider">Dokumen Fisik Lengkap</span>
+                    <div className="text-2xl font-extrabold text-purple-600 dark:text-purple-400 mt-1">
+                      {dashboardStats.fisikLengkapCount} <span className="text-xs font-medium text-purple-600/70">SLS ({((dashboardStats.fisikLengkapCount / (dashboardStats.totalPeta || 1)) * 100).toFixed(1)}%)</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 shadow-xs">
+                    <span className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Sudah Scanning</span>
+                    <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">
+                      {dashboardStats.scanSudah} <span className="text-xs font-medium text-blue-600/70">SLS ({dashboardStats.scanPct}%)</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 shadow-xs">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Selesai Pengolahan</span>
+                    <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
+                      {dashboardStats.olahSudah} <span className="text-xs font-medium text-emerald-600/70">SLS ({dashboardStats.olahPct}%)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Visual Charts Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {/* Donut Chart Status Olah */}
+                  <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs flex flex-col justify-between">
+                    <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-3">
+                      🟢 Proporsi Selesai Pengolahan Peta
+                    </h3>
+                    <div className="w-full flex items-center justify-center my-auto min-h-[280px]">
+                      <ReactApexChart
+                        options={olahDonutOptions}
+                        series={olahDonutSeries}
+                        type="donut"
+                        width="100%"
+                        height={300}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Donut Chart Status Scan */}
+                  <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs flex flex-col justify-between">
+                    <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-3">
+                      🔵 Proporsi Hasil Scanning Peta
+                    </h3>
+                    <div className="w-full flex items-center justify-center my-auto min-h-[280px]">
+                      <ReactApexChart
+                        options={scanDonutOptions}
+                        series={scanDonutSeries}
+                        type="donut"
+                        width="100%"
+                        height={300}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bar Chart 4 Pilar Pengolahan */}
+                  <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs flex flex-col justify-between">
+                    <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-3">
+                      📊 Perbandingan Komponen Utama
+                    </h3>
+                    <div className="w-full min-h-[280px]">
+                      <ReactApexChart
+                        options={overviewBarOptions}
+                        series={overviewBarSeries}
+                        type="bar"
+                        width="100%"
+                        height={300}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: PROGRES CAPAIAN WILAYAH (DRILL-DOWN INTERAKTIF KECAMATAN → DESA → SLS) */}
+            {activeDashboardTab === "progres_wilayah" && (
+              <div className="space-y-4 flex-1 flex flex-col overflow-hidden">
+                {/* Breadcrumb Navigasi Jalur & Filter Quick Selection */}
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+                  {/* Breadcrumbs */}
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300 flex-wrap">
+                    <button
+                      onClick={() => {
+                        setDashSelectedKec("all");
+                        setDashSelectedDesa("all");
+                      }}
+                      className={`px-3 py-1.5 rounded-xl border transition cursor-pointer ${
+                        dashSelectedKec === "all"
+                          ? "bg-brand-500 text-white border-brand-500"
+                          : "bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600"
+                      }`}
+                    >
+                      🏛️ Semua Kecamatan ({kecProgressList.length})
+                    </button>
+
+                    {dashSelectedKec !== "all" && (
+                      <>
+                        <span className="text-gray-400">➔</span>
+                        <button
+                          onClick={() => setDashSelectedDesa("all")}
+                          className={`px-3 py-1.5 rounded-xl border transition cursor-pointer ${
+                            dashSelectedDesa === "all"
+                              ? "bg-brand-500 text-white border-brand-500"
+                              : "bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600"
+                          }`}
+                        >
+                          🏡 Kecamatan {kecProgressList.find((k) => k.kode === dashSelectedKec)?.nama} ({desaProgressList.length} Desa)
+                        </button>
+                      </>
+                    )}
+
+                    {dashSelectedDesa !== "all" && (
+                      <>
+                        <span className="text-gray-400">➔</span>
+                        <span className="px-3 py-1.5 rounded-xl bg-purple-600 text-white border border-purple-600">
+                          📍 Desa {desaProgressList.find((d) => d.kode === dashSelectedDesa)?.nama} ({slsProgressList.length} SLS)
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Reset Drill-down Button */}
+                  {(dashSelectedKec !== "all" || dashSelectedDesa !== "all") && (
+                    <button
+                      onClick={() => {
+                        setDashSelectedKec("all");
+                        setDashSelectedDesa("all");
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold transition cursor-pointer self-end md:self-auto"
+                    >
+                      ⬅️ Kembali ke Rekap Kecamatan
+                    </button>
+                  )}
+                </div>
+
+                {/* Content Table Container Full Height */}
+                <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs">
+                  {/* LEVEL 1: TABEL KECAMATAN */}
+                  {dashSelectedKec === "all" && (
+                    <div className="p-2 sm:p-3 space-y-2.5">
+                      <div className="bg-gray-50 dark:bg-gray-700/60 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                        <span>🏛️ Rekapitulasi Seluruh 28 Kecamatan (BPS Kab. Lebak)</span>
+                        <span className="text-brand-600 dark:text-brand-400 font-semibold text-[11px] hidden sm:inline">*Klik baris kecamatan untuk rincian desa</span>
+                      </div>
+
+                      {/* Desktop View: 2 Kolom Berdampingan */}
+                      <div className="hidden lg:grid lg:grid-cols-2 gap-3">
+                        {[
+                          kecProgressList.slice(0, Math.ceil(kecProgressList.length / 2)),
+                          kecProgressList.slice(Math.ceil(kecProgressList.length / 2)),
+                        ].map((group, groupIdx) => (
+                          <div key={groupIdx} className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[10px]">
+                                  <th className="py-1.5 px-2.5 w-12 text-center">Kd</th>
+                                  <th className="py-1.5 px-2.5">Kecamatan</th>
+                                  <th className="py-1.5 px-2 text-center w-14">SLS</th>
+                                  <th className="py-1.5 px-2 text-center w-20 text-blue-600">Scan</th>
+                                  <th className="py-1.5 px-2 text-center w-24 text-emerald-600">Olah</th>
+                                  <th className="py-1.5 px-2 text-center w-36">Progres Olah</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-[11px]">
+                                {group.map((k) => {
+                                  const pct = Math.round((k.olahSudah / (k.total || 1)) * 100);
+                                  return (
+                                    <tr
+                                      key={k.kode}
+                                      onClick={() => setDashSelectedKec(k.kode)}
+                                      className="hover:bg-brand-50/70 dark:hover:bg-brand-950/40 cursor-pointer transition select-none"
+                                    >
+                                      <td className="py-1.5 px-2.5 text-center font-mono font-bold text-brand-600 text-[11px]">{k.kode}</td>
+                                      <td className="py-1.5 px-2.5 font-bold text-gray-900 dark:text-white truncate max-w-[150px]">{k.nama}</td>
+                                      <td className="py-1.5 px-2 text-center font-semibold text-gray-600 dark:text-gray-400">{k.total}</td>
+                                      <td className="py-1.5 px-2 text-center font-semibold text-blue-600 dark:text-blue-400">{k.scanSudah}</td>
+                                      <td className="py-1.5 px-2 text-center font-bold">
+                                        <span className="text-emerald-600">{k.olahSudah}</span>
+                                        <span className="text-gray-400 mx-1">/</span>
+                                        <span className="text-rose-500">{k.olahBelum}</span>
+                                      </td>
+                                      <td className="py-1.5 px-2 text-center">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div
+                                              className={`h-2 rounded-full transition-all ${
+                                                pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                              }`}
+                                              style={{ width: `${pct}%` }}
+                                            />
+                                          </div>
+                                          <span className="font-extrabold text-[11px] text-gray-900 dark:text-white w-8 text-right">{pct}%</span>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Mobile View: Kartu Minimalis */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-2">
+                        {kecProgressList.map((k) => {
+                          const pct = Math.round((k.olahSudah / (k.total || 1)) * 100);
+                          return (
+                            <div
+                              key={k.kode}
+                              onClick={() => setDashSelectedKec(k.kode)}
+                              className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-brand-500 cursor-pointer shadow-xs transition"
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-400">
+                                    {k.kode}
+                                  </span>
+                                  <h4 className="font-bold text-xs text-gray-900 dark:text-white">{k.nama}</h4>
+                                </div>
+                                <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                                  pct === 100
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : pct >= 50
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                    : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                }`}>
+                                  {pct}% Olah
+                                </span>
+                              </div>
+
+                              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden mb-2">
+                                <div
+                                  className={`h-2 rounded-full transition-all ${
+                                    pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                  }`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                                <span>Total: <strong>{k.total}</strong> SLS</span>
+                                <span>Scan: <strong className="text-blue-600">{k.scanSudah}</strong></span>
+                                <span className="text-brand-600 dark:text-brand-400 font-bold text-[10px]">Rincian Desa ➔</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* LEVEL 2: TABEL DESA (Ketika Kecamatan Dipilih) */}
+                  {dashSelectedKec !== "all" && dashSelectedDesa === "all" && (
+                    <div className="p-2 sm:p-3 space-y-2.5">
+                      <div className="bg-purple-50 dark:bg-purple-950/40 p-2.5 rounded-xl border border-purple-100 dark:border-purple-900 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center justify-between">
+                        <span>
+                          🏡 Daftar Desa pada Kecamatan {kecProgressList.find((k) => k.kode === dashSelectedKec)?.nama} ({desaProgressList.length} Desa/Kelurahan)
+                        </span>
+                        <span className="font-semibold text-[11px] hidden sm:inline">*Klik desa untuk melihat rincian baris SLS</span>
+                      </div>
+
+                      {/* Desktop View: Tabel Desa */}
+                      <div className="hidden lg:grid lg:grid-cols-2 gap-3">
+                        {[
+                          desaProgressList.slice(0, Math.ceil(desaProgressList.length / 2)),
+                          desaProgressList.slice(Math.ceil(desaProgressList.length / 2)),
+                        ].map((group, groupIdx) => (
+                          <div key={groupIdx} className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[10px]">
+                                  <th className="py-1.5 px-2.5 w-12 text-center">Kd</th>
+                                  <th className="py-1.5 px-2.5">Desa / Kelurahan</th>
+                                  <th className="py-1.5 px-2 text-center w-14">SLS</th>
+                                  <th className="py-1.5 px-2 text-center w-20 text-blue-600">Scan</th>
+                                  <th className="py-1.5 px-2 text-center w-24 text-emerald-600">Olah</th>
+                                  <th className="py-1.5 px-2 text-center w-36">Progres Olah</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-[11px]">
+                                {group.map((d) => {
+                                  const pct = Math.round((d.olahSudah / (d.total || 1)) * 100);
+                                  return (
+                                    <tr
+                                      key={d.kode}
+                                      onClick={() => setDashSelectedDesa(d.kode)}
+                                      className="hover:bg-purple-50/70 dark:hover:bg-purple-950/40 cursor-pointer transition select-none"
+                                    >
+                                      <td className="py-1.5 px-2.5 text-center font-mono font-bold text-purple-600 text-[11px]">{d.kode}</td>
+                                      <td className="py-1.5 px-2.5 font-bold text-gray-900 dark:text-white truncate max-w-[150px]">{d.nama}</td>
+                                      <td className="py-1.5 px-2 text-center font-semibold text-gray-600 dark:text-gray-400">{d.total}</td>
+                                      <td className="py-1.5 px-2 text-center font-semibold text-blue-600 dark:text-blue-400">{d.scanSudah}</td>
+                                      <td className="py-1.5 px-2 text-center font-bold">
+                                        <span className="text-emerald-600">{d.olahSudah}</span>
+                                        <span className="text-gray-400 mx-1">/</span>
+                                        <span className="text-rose-500">{d.olahBelum}</span>
+                                      </td>
+                                      <td className="py-1.5 px-2 text-center">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                          <div className="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div
+                                              className={`h-2 rounded-full transition-all ${
+                                                pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                              }`}
+                                              style={{ width: `${pct}%` }}
+                                            />
+                                          </div>
+                                          <span className="font-extrabold text-[11px] text-gray-900 dark:text-white w-8 text-right">{pct}%</span>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Mobile View: Kartu Desa */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-2">
+                        {desaProgressList.map((d) => {
+                          const pct = Math.round((d.olahSudah / (d.total || 1)) * 100);
+                          return (
+                            <div
+                              key={d.kode}
+                              onClick={() => setDashSelectedDesa(d.kode)}
+                              className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-purple-500 cursor-pointer shadow-xs transition"
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
+                                    {d.kode}
+                                  </span>
+                                  <h4 className="font-bold text-xs text-gray-900 dark:text-white">{d.nama}</h4>
+                                </div>
+                                <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                                  pct === 100
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : pct >= 50
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                    : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                }`}>
+                                  {pct}%
+                                </span>
+                              </div>
+
+                              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden mb-2">
+                                <div
+                                  className={`h-2 rounded-full transition-all ${
+                                    pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                  }`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                                <span>Total: <strong>{d.total}</strong> SLS</span>
+                                <span>Scan: <strong className="text-blue-600">{d.scanSudah}</strong></span>
+                                <span className="text-purple-600 dark:text-purple-400 font-bold text-[10px]">Rincian SLS ➔</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* LEVEL 3: TABEL RINCIAN DETAIL SLS / SUBSLS */}
+                  {dashSelectedKec !== "all" && dashSelectedDesa !== "all" && (
+                    <div className="p-2 sm:p-3 space-y-2.5">
+                      <div className="bg-purple-50 dark:bg-purple-950/40 p-2.5 rounded-xl border border-purple-100 dark:border-purple-900 text-xs font-bold text-purple-700 dark:text-purple-300 flex items-center justify-between">
+                        <span>
+                          📍 Rincian Detail SLS pada Desa {desaProgressList.find((d) => d.kode === dashSelectedDesa)?.nama} ({slsProgressList.length} Baris SLS)
+                        </span>
+                        <span className="font-normal text-[11px] text-gray-500 dark:text-gray-400 hidden sm:inline">*Menampilkan status scan, olah, & petugas alokasi</span>
+                      </div>
+
+                      {/* Desktop Table View */}
+                      <div className="hidden sm:block rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[10px]">
+                              <th className="py-2 px-3 w-36">ID SubSLS</th>
+                              <th className="py-2 px-3 min-w-[160px]">Nama SLS / SubSLS</th>
+                              <th className="py-2 px-3 w-32">Petugas</th>
+                              <th className="py-2 px-2.5 text-center w-24">Scan</th>
+                              <th className="py-2 px-2.5 text-center w-24">Olah</th>
+                              <th className="py-2 px-3 min-w-[220px]">Catatan / Kendala</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-[11px]">
+                            {slsProgressList.map((item) => (
+                              <tr key={item.idsubsls} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                <td className="py-2 px-3 font-mono font-bold text-brand-600 text-xs">{item.idsubsls}</td>
+                                <td className="py-2 px-3 font-bold text-gray-900 dark:text-white text-xs">{item.nama_sls}</td>
+                                <td className="py-2 px-3 text-xs">
+                                  {item.nama_petugas ? (
+                                    <span className="font-semibold text-gray-800 dark:text-gray-200">{item.nama_petugas}</span>
+                                  ) : (
+                                    <span className="text-gray-400 italic">Belum Dialokasi</span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-2.5 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    item.status_scan === "Sudah"
+                                      ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                                      : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                  }`}>
+                                    {item.status_scan}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-2.5 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    item.status_olah === "Sudah"
+                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                      : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                                  }`}>
+                                    {item.status_olah}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3">
+                                  {item.pendingTasks.length === 0 ? (
+                                    <span className="text-emerald-600 font-bold text-[11px] flex items-center gap-1">
+                                      <span>✓</span> Lengkap & Selesai
+                                    </span>
+                                  ) : (
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      {item.pendingTasks.map((pt, idx) => (
+                                        <span
+                                          key={idx}
+                                          className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[10px] font-semibold"
+                                        >
+                                          ⚠️ {pt}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile View: Kartu SLS */}
+                      <div className="space-y-2 sm:hidden">
+                        {slsProgressList.map((item) => (
+                          <div
+                            key={item.idsubsls}
+                            className="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-mono text-[11px] font-bold text-brand-600">{item.idsubsls}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  item.status_scan === "Sudah" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
+                                }`}>
+                                  Scan: {item.status_scan}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  item.status_olah === "Sudah" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                                }`}>
+                                  Olah: {item.status_olah}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="font-bold text-xs text-gray-900 dark:text-white mb-1">{item.nama_sls}</div>
+                            <div className="text-[11px] text-gray-500 mb-2">
+                              Petugas: <strong>{item.nama_petugas || "Belum ada"}</strong>
+                            </div>
+                            {item.pendingTasks.length === 0 ? (
+                              <div className="text-emerald-600 font-bold text-[11px] flex items-center gap-1">
+                                <span>✓</span> Selesai Olah & Scan
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {item.pendingTasks.map((pt, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 text-[10px] font-semibold"
+                                  >
+                                    ⚠️ {pt}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: PROGRES PETUGAS PENGOLAHAN */}
+            {activeDashboardTab === "progres_petugas" && (
+              <div className="space-y-4 flex-1 flex flex-col overflow-hidden">
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      👥 Rekapitulasi Beban & Capaian Masing-Masing Petugas
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Evaluasi volume alokasi tugas, status scanning, dan progres penyelesaian pengolahan peta.
+                    </p>
+                  </div>
+                  <div className="w-full sm:w-64">
+                    <input
+                      type="text"
+                      placeholder="Cari nama petugas..."
+                      value={dashPetugasSearchQuery}
+                      onChange={(e) => setDashPetugasSearchQuery(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Tabel Capaian Petugas */}
+                <div className="flex-1 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs p-3">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-100 dark:bg-gray-700/80 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-600 uppercase tracking-wider text-[10px]">
+                          <th className="py-2.5 px-3">Nama Petugas</th>
+                          <th className="py-2.5 px-3 text-center w-24">Beban SLS</th>
+                          <th className="py-2.5 px-3 text-center w-28 text-blue-600">Sudah Scan</th>
+                          <th className="py-2.5 px-3 text-center w-36 text-emerald-600">Selesai Olah</th>
+                          <th className="py-2.5 px-3 text-center w-48">Persentase Pengolahan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-xs">
+                        {petugasProgressList.map((p) => {
+                          const pct = p.total > 0 ? Math.round((p.olahSudah / p.total) * 100) : 0;
+                          const scanPct = p.total > 0 ? Math.round((p.scanSudah / p.total) * 100) : 0;
+
+                          return (
+                            <tr key={p.petugasId} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition">
+                              <td className="py-2.5 px-3">
+                                <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                  <span>{p.petugasId === "unassigned" ? "⚠️" : "👤"}</span>
+                                  <span className={p.petugasId === "unassigned" ? "text-rose-600 italic" : ""}>{p.nama}</span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-bold text-gray-800 dark:text-gray-200">
+                                {p.total}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-semibold text-blue-600 dark:text-blue-400">
+                                {p.scanSudah} <span className="text-[10px] text-gray-400">({scanPct}%)</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-bold">
+                                <span className="text-emerald-600">{p.olahSudah}</span>
+                                <span className="text-gray-400 mx-1">/</span>
+                                <span className="text-rose-500">{p.olahBelum}</span>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                                    <div
+                                      className={`h-2.5 rounded-full transition-all ${
+                                        pct === 100 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-rose-500"
+                                      }`}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                  <span className="font-extrabold text-xs text-gray-900 dark:text-white w-9 text-right">
+                                    {pct}%
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
